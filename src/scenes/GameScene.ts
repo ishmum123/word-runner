@@ -5,24 +5,22 @@ import { ScoreSystem } from '../systems/ScoreSystem';
 import { DifficultySystem } from '../systems/DifficultySystem';
 import { soundManager } from '../audio/SoundManager';
 
-// 3D Perspective - player runs INTO the screen
-const HORIZON_Y = 250;
-const GROUND_Y = 800;
+// Layout constants
+const GATE_START_Y = 180; // Gates appear just below English word
+const PLAYER_Y = 620; // Player position (moved up from bottom)
 const VANISHING_POINT_X = 240;
 
 // Track scaling
-const TRACK_WIDTH_FAR = 30;
-const TRACK_WIDTH_NEAR = 450;
+const TRACK_WIDTH_START = 80; // Width at spawn point
+const TRACK_WIDTH_END = 420; // Width at player
 
-const BASE_SPEED = 100;
-const GATE_SPACING = 2000; // Distance between gates
-const MAX_Z = 2500; // How far we can see
-const Z_SPEED_MULTIPLIER = 3; // Controls how fast things approach (tuned for 5-7 sec travel time)
+// Timing
+const GATE_TRAVEL_TIME = 6000; // 6 seconds to reach player
+const GATE_SPACING_TIME = 6500; // Time between gate spawns (ms)
 
-// Get lane X position based on depth (z)
-const getLaneX = (lane: Lane, z: number): number => {
-  const t = Math.max(0, 1 - z / MAX_Z);
-  const trackWidth = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t;
+// Get lane X position based on progress (0 = top, 1 = player)
+const getLaneX = (lane: Lane, progress: number): number => {
+  const trackWidth = TRACK_WIDTH_START + (TRACK_WIDTH_END - TRACK_WIDTH_START) * progress;
   const laneOffset = trackWidth / 3;
 
   switch (lane) {
@@ -32,28 +30,12 @@ const getLaneX = (lane: Lane, z: number): number => {
   }
 };
 
-// Get Y position based on depth
-const getYFromZ = (z: number): number => {
-  const t = Math.max(0, 1 - z / MAX_Z);
-  return HORIZON_Y + (GROUND_Y - HORIZON_Y) * Math.pow(t, 0.7);
-};
-
-// Get scale based on depth
-const getScaleFromZ = (z: number): number => {
-  const t = Math.max(0, 1 - z / MAX_Z);
-  return 0.1 + 0.9 * Math.pow(t, 0.8);
-};
-
 interface Gate3D {
   container: Phaser.GameObjects.Container;
-  z: number;
+  progress: number; // 0 = just spawned at top, 1 = at player
   question: WordQuestion;
   processed: boolean;
-}
-
-interface TrackTile {
-  graphics: Phaser.GameObjects.Graphics;
-  z: number;
+  spawnTime: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -72,8 +54,8 @@ export class GameScene extends Phaser.Scene {
 
   private questionStartTime: number = 0;
   private gates3D: Gate3D[] = [];
+  private lastGateSpawnTime: number = 0;
 
-  private trackTiles: TrackTile[] = [];
   private trackGraphics!: Phaser.GameObjects.Graphics;
 
   // UI Elements
@@ -100,14 +82,7 @@ export class GameScene extends Phaser.Scene {
     this.createPlayer();
     this.createUI();
     this.setupInput();
-
-    // Spawn first gate
     this.spawnGate();
-
-    // Initialize track tiles
-    for (let z = 0; z < MAX_Z; z += 80) {
-      this.spawnTrackTile(z);
-    }
   }
 
   private resetGameState(): void {
@@ -125,70 +100,46 @@ export class GameScene extends Phaser.Scene {
     this.gameSpeed = 1;
     this.currentLane = 'center';
     this.gates3D = [];
-    this.trackTiles = [];
+    this.lastGateSpawnTime = 0;
   }
 
   private createBackground(): void {
     const { width, height } = this.cameras.main;
     const bg = this.add.graphics();
 
-    // Dark sky gradient
-    bg.fillGradientStyle(0x0a0510, 0x0a0510, 0x1a1025, 0x1a1025);
-    bg.fillRect(0, 0, width, HORIZON_Y + 50);
+    // Dark gradient background
+    bg.fillGradientStyle(0x0a0510, 0x0a0510, 0x15102a, 0x15102a);
+    bg.fillRect(0, 0, width, height);
 
-    // Atmospheric fog at horizon
-    bg.fillGradientStyle(0x2a2035, 0x2a2035, 0x1a1520, 0x1a1520, 0.8);
-    bg.fillRect(0, HORIZON_Y - 30, width, 80);
-
-    // Ground/jungle
-    bg.fillGradientStyle(0x1a2510, 0x1a2510, 0x0a1508, 0x0a1508);
-    bg.fillRect(0, HORIZON_Y, width, height - HORIZON_Y);
-
-    // Distant mountain/temple silhouettes
-    bg.fillStyle(0x15101a, 0.9);
-    bg.fillTriangle(60, HORIZON_Y, 150, HORIZON_Y - 80, 240, HORIZON_Y);
-    bg.fillTriangle(200, HORIZON_Y, 280, HORIZON_Y - 50, 360, HORIZON_Y);
-    bg.fillTriangle(320, HORIZON_Y, 400, HORIZON_Y - 70, 480, HORIZON_Y);
-
-    // Temple structure at vanishing point
-    bg.fillStyle(0x1a1520, 1);
-    bg.fillRect(VANISHING_POINT_X - 25, HORIZON_Y - 40, 50, 40);
-    bg.fillTriangle(VANISHING_POINT_X - 35, HORIZON_Y - 40, VANISHING_POINT_X, HORIZON_Y - 70, VANISHING_POINT_X + 35, HORIZON_Y - 40);
+    // Distant mountains/temple silhouette
+    bg.fillStyle(0x12081a, 0.9);
+    bg.fillTriangle(40, GATE_START_Y + 20, 120, GATE_START_Y - 30, 200, GATE_START_Y + 20);
+    bg.fillTriangle(180, GATE_START_Y + 20, 250, GATE_START_Y - 20, 320, GATE_START_Y + 20);
+    bg.fillTriangle(280, GATE_START_Y + 20, 360, GATE_START_Y - 35, 440, GATE_START_Y + 20);
   }
 
   private createTrack(): void {
     this.trackGraphics = this.add.graphics();
-  }
-
-  private spawnTrackTile(z: number): void {
-    const tile: TrackTile = {
-      graphics: this.add.graphics(),
-      z: z
-    };
-    this.trackTiles.push(tile);
+    this.drawTrack();
   }
 
   private drawTrack(): void {
     this.trackGraphics.clear();
 
-    // Draw the main track surface
-    const steps = 30;
+    const steps = 40;
     for (let i = 0; i < steps; i++) {
-      const z1 = (i / steps) * MAX_Z;
-      const z2 = ((i + 1) / steps) * MAX_Z;
+      const p1 = i / steps;
+      const p2 = (i + 1) / steps;
 
-      const y1 = getYFromZ(z1);
-      const y2 = getYFromZ(z2);
+      const y1 = GATE_START_Y + (PLAYER_Y - GATE_START_Y) * p1;
+      const y2 = GATE_START_Y + (PLAYER_Y - GATE_START_Y) * p2;
 
-      const t1 = 1 - z1 / MAX_Z;
-      const t2 = 1 - z2 / MAX_Z;
+      const w1 = TRACK_WIDTH_START + (TRACK_WIDTH_END - TRACK_WIDTH_START) * p1;
+      const w2 = TRACK_WIDTH_START + (TRACK_WIDTH_END - TRACK_WIDTH_START) * p2;
 
-      const w1 = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t1;
-      const w2 = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t2;
-
-      // Track color gets lighter as it gets closer
-      const brightness = Math.floor(40 + 30 * t1);
-      const trackColor = (brightness << 16) | ((brightness + 10) << 8) | (brightness - 10);
+      // Track surface with depth shading
+      const brightness = Math.floor(30 + 25 * p1);
+      const trackColor = (brightness << 16) | ((brightness + 8) << 8) | (brightness - 5);
 
       this.trackGraphics.fillStyle(trackColor, 1);
       this.trackGraphics.beginPath();
@@ -198,129 +149,97 @@ export class GameScene extends Phaser.Scene {
       this.trackGraphics.lineTo(VANISHING_POINT_X - w2 / 2, y2);
       this.trackGraphics.closePath();
       this.trackGraphics.fillPath();
-    }
 
-    // Track edges with glow
-    this.trackGraphics.lineStyle(3, 0xc9a227, 0.8);
-    this.trackGraphics.beginPath();
-    this.trackGraphics.moveTo(VANISHING_POINT_X - TRACK_WIDTH_FAR / 2, HORIZON_Y);
-    this.trackGraphics.lineTo(VANISHING_POINT_X - TRACK_WIDTH_NEAR / 2, GROUND_Y);
-    this.trackGraphics.strokePath();
+      // Horizontal lines for depth
+      if (i % 4 === 0) {
+        this.trackGraphics.lineStyle(1 + p1 * 2, 0x1a1520, 0.5);
+        this.trackGraphics.lineBetween(VANISHING_POINT_X - w1 / 2, y1, VANISHING_POINT_X + w1 / 2, y1);
+      }
 
-    this.trackGraphics.beginPath();
-    this.trackGraphics.moveTo(VANISHING_POINT_X + TRACK_WIDTH_FAR / 2, HORIZON_Y);
-    this.trackGraphics.lineTo(VANISHING_POINT_X + TRACK_WIDTH_NEAR / 2, GROUND_Y);
-    this.trackGraphics.strokePath();
-  }
-
-  private renderTrackTiles(): void {
-    for (const tile of this.trackTiles) {
-      tile.graphics.clear();
-
-      if (tile.z < 0 || tile.z > MAX_Z) continue;
-
-      const y = getYFromZ(tile.z);
-      const t = 1 - tile.z / MAX_Z;
-      const w = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t;
-
-      if (t < 0.02) continue;
-
-      // Horizontal tile line
-      tile.graphics.lineStyle(1 + t * 3, 0x2a2520, 0.3 + t * 0.5);
-      tile.graphics.beginPath();
-      tile.graphics.moveTo(VANISHING_POINT_X - w / 2, y);
-      tile.graphics.lineTo(VANISHING_POINT_X + w / 2, y);
-      tile.graphics.strokePath();
-
-      // Lane markers (vertical dashes)
-      if (t > 0.1) {
-        const laneW = w / 3;
-        tile.graphics.lineStyle(1 + t * 2, 0x3a3530, 0.2 + t * 0.3);
-
-        // Left lane marker
-        tile.graphics.beginPath();
-        tile.graphics.moveTo(VANISHING_POINT_X - laneW / 2, y - 2);
-        tile.graphics.lineTo(VANISHING_POINT_X - laneW / 2, y + 2);
-        tile.graphics.strokePath();
-
-        // Right lane marker
-        tile.graphics.beginPath();
-        tile.graphics.moveTo(VANISHING_POINT_X + laneW / 2, y - 2);
-        tile.graphics.lineTo(VANISHING_POINT_X + laneW / 2, y + 2);
-        tile.graphics.strokePath();
+      // Lane dividers
+      if (p1 > 0.1) {
+        this.trackGraphics.lineStyle(1 + p1, 0x2a2030, 0.4);
+        const laneW = w1 / 3;
+        this.trackGraphics.lineBetween(VANISHING_POINT_X - laneW / 2, y1, VANISHING_POINT_X - laneW / 2, y2);
+        this.trackGraphics.lineBetween(VANISHING_POINT_X + laneW / 2, y1, VANISHING_POINT_X + laneW / 2, y2);
       }
     }
+
+    // Track edges with gold trim
+    this.trackGraphics.lineStyle(3, 0xc9a227, 0.8);
+    this.trackGraphics.lineBetween(
+      VANISHING_POINT_X - TRACK_WIDTH_START / 2, GATE_START_Y,
+      VANISHING_POINT_X - TRACK_WIDTH_END / 2, PLAYER_Y + 80
+    );
+    this.trackGraphics.lineBetween(
+      VANISHING_POINT_X + TRACK_WIDTH_START / 2, GATE_START_Y,
+      VANISHING_POINT_X + TRACK_WIDTH_END / 2, PLAYER_Y + 80
+    );
   }
 
   private createPlayer(): void {
-    // Player is at z=0, viewed from BEHIND (running into screen)
-    const playerZ = 50;
-    const playerX = getLaneX('center', playerZ);
-    const playerY = getYFromZ(playerZ);
+    const playerX = getLaneX('center', 1);
 
-    // Shadow first (rendered below player)
     this.playerShadow = this.add.graphics();
+    this.playerShadow.fillStyle(0x000000, 0.4);
+    this.playerShadow.fillEllipse(playerX, PLAYER_Y + 45, 50, 15);
 
-    this.player = this.add.container(playerX, playerY);
+    this.player = this.add.container(playerX, PLAYER_Y);
 
     const body = this.add.graphics();
 
-    // === SIMPLE BACK VIEW OF RUNNER (no facial features) ===
-
-    // Legs (dark pants)
+    // Simple back view runner (no facial features)
+    // Legs
     body.fillStyle(0x2a3a4a, 1);
-    body.fillRoundedRect(-16, 20, 12, 40, 4); // Left leg
-    body.fillRoundedRect(4, 20, 12, 40, 4);   // Right leg
+    body.fillRoundedRect(-14, 15, 10, 35, 4);
+    body.fillRoundedRect(4, 15, 10, 35, 4);
 
-    // Torso (shirt) - back view
+    // Torso
     body.fillStyle(0xc04040, 1);
-    body.fillRoundedRect(-20, -25, 40, 50, 6);
+    body.fillRoundedRect(-18, -22, 36, 42, 6);
 
-    // Back detail (shirt fold)
+    // Back fold
     body.fillStyle(0xa03030, 1);
-    body.fillRect(-2, -20, 4, 40);
+    body.fillRect(-2, -18, 4, 35);
 
-    // Arms (sleeves, no skin)
+    // Arms (sleeves)
     body.fillStyle(0xc04040, 1);
-    body.fillRoundedRect(-28, -20, 10, 35, 4); // Left arm
-    body.fillRoundedRect(18, -20, 10, 35, 4);  // Right arm
+    body.fillRoundedRect(-26, -18, 10, 30, 4);
+    body.fillRoundedRect(16, -18, 10, 30, 4);
 
-    // Head - just hair covering entire back of head
+    // Head - just hair
     body.fillStyle(0x2a1a0a, 1);
-    body.fillCircle(0, -45, 20);
-    body.fillEllipse(0, -52, 22, 15);
+    body.fillCircle(0, -38, 18);
+    body.fillEllipse(0, -45, 20, 14);
 
     this.player.add(body);
-    this.player.setScale(0.9);
+    this.player.setScale(0.85);
 
-    // Running animation - bob up and down
+    // Running bob
     this.tweens.add({
       targets: this.player,
-      y: playerY - 8,
-      duration: 150,
+      y: PLAYER_Y - 6,
+      duration: 140,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
   }
 
-  private updatePlayerPosition(): void {
-    const playerZ = 50;
-
-    // Update shadow
+  private updatePlayerShadow(): void {
     this.playerShadow.clear();
-    this.playerShadow.fillStyle(0x000000, 0.3);
-    this.playerShadow.fillEllipse(this.player.x, getYFromZ(playerZ) + 55, 50, 15);
+    this.playerShadow.fillStyle(0x000000, 0.4);
+    this.playerShadow.fillEllipse(this.player.x, PLAYER_Y + 45, 50, 15);
   }
 
   private createUI(): void {
     const { width } = this.cameras.main;
 
-    // Top bar
+    // Top bar (opaque)
     const topBar = this.add.graphics();
-    topBar.fillStyle(0x0a0510, 0.9);
+    topBar.fillStyle(0x0a0510, 1);
     topBar.fillRect(0, 0, width, 65);
-    topBar.lineStyle(2, 0xc9a227, 0.6);
+    topBar.lineStyle(2, 0xc9a227, 0.7);
     topBar.lineBetween(0, 65, width, 65);
 
     // Lives
@@ -349,7 +268,7 @@ export class GameScene extends Phaser.Scene {
 
     // English word prompt
     const promptBg = this.add.graphics();
-    promptBg.fillStyle(0x0a0510, 0.95);
+    promptBg.fillStyle(0x0a0510, 1);
     promptBg.fillRoundedRect(width / 2 - 160, 75, 320, 65, 10);
     promptBg.lineStyle(3, 0xc9a227, 0.9);
     promptBg.strokeRoundedRect(width / 2 - 160, 75, 320, 65, 10);
@@ -360,21 +279,21 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5);
 
-    // Bottom bar
+    // Bottom bar (OPAQUE - not transparent)
     const bottomBar = this.add.graphics();
-    bottomBar.fillStyle(0x0a0510, 0.9);
-    bottomBar.fillRect(0, 755, width, 45);
-    bottomBar.lineStyle(2, 0xc9a227, 0.6);
-    bottomBar.lineBetween(0, 755, width, 755);
+    bottomBar.fillStyle(0x0a0510, 1); // Fully opaque
+    bottomBar.fillRect(0, 720, width, 80); // Extended height
+    bottomBar.lineStyle(2, 0xc9a227, 0.7);
+    bottomBar.lineBetween(0, 720, width, 720);
 
-    this.hskText = this.add.text(20, 772, 'HSK 1', {
-      fontSize: '18px',
+    this.hskText = this.add.text(20, 740, 'HSK 1', {
+      fontSize: '20px',
       fontFamily: 'Arial Black',
       color: '#c9a227',
     });
 
-    this.distanceText = this.add.text(width - 20, 772, '0m', {
-      fontSize: '18px',
+    this.distanceText = this.add.text(width - 20, 740, '0m', {
+      fontSize: '20px',
       fontFamily: 'Arial',
       color: '#ffffff',
     }).setOrigin(1, 0);
@@ -430,8 +349,7 @@ export class GameScene extends Phaser.Scene {
     this.isMoving = true;
     soundManager.play('whoosh');
 
-    const playerZ = 50;
-    const targetX = getLaneX(lane, playerZ);
+    const targetX = getLaneX(lane, 1);
 
     this.tweens.add({
       targets: this.player,
@@ -452,86 +370,75 @@ export class GameScene extends Phaser.Scene {
     }
 
     const gate: Gate3D = {
-      container: this.add.container(VANISHING_POINT_X, HORIZON_Y),
-      z: MAX_Z - 50, // Always spawn at the far horizon
+      container: this.add.container(VANISHING_POINT_X, GATE_START_Y),
+      progress: 0,
       question: question,
       processed: false,
+      spawnTime: this.time.now,
     };
 
     this.gates3D.push(gate);
+    this.lastGateSpawnTime = this.time.now;
   }
 
   private renderGate(gate: Gate3D): void {
     gate.container.removeAll(true);
 
-    if (gate.z < 0 || gate.z > MAX_Z) {
-      gate.container.setVisible(false);
-      return;
-    }
+    const p = gate.progress;
+    const y = GATE_START_Y + (PLAYER_Y - GATE_START_Y) * p;
 
-    const y = getYFromZ(gate.z);
-    const scale = getScaleFromZ(gate.z);
-    const t = 1 - gate.z / MAX_Z;
+    // Scale: start at 0.4 (readable), grow to 1.0
+    const scale = 0.4 + 0.6 * p;
 
-    if (t < 0.01) {
-      gate.container.setVisible(false);
-      return;
-    }
+    // Alpha: fade in quickly, stay visible
+    const alpha = Math.min(1, p * 5 + 0.3);
 
-    gate.container.setVisible(true);
     gate.container.setPosition(VANISHING_POINT_X, y);
     gate.container.setScale(scale);
-    gate.container.setAlpha(0.2 + 0.8 * t);
-    gate.container.setDepth(1000 - gate.z);
+    gate.container.setAlpha(alpha);
+    gate.container.setDepth(100 + Math.floor(p * 100));
 
-    const trackWidth = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t;
+    const trackWidth = TRACK_WIDTH_START + (TRACK_WIDTH_END - TRACK_WIDTH_START) * p;
     const gateWidth = trackWidth / scale;
-    const gateHeight = 120;
+    const gateHeight = 100;
 
     const gfx = this.add.graphics();
 
-    // Temple gate pillars
-    const pillarW = 30;
+    // Gate pillars
+    const pillarW = 25;
 
     // Left pillar
     gfx.fillStyle(0x4a3a2a, 1);
-    gfx.fillRect(-gateWidth / 2 - pillarW, -gateHeight, pillarW, gateHeight + 30);
-    gfx.fillStyle(0x5a4a3a, 0.5);
-    gfx.fillRect(-gateWidth / 2 - pillarW, -gateHeight, 10, gateHeight + 30);
+    gfx.fillRect(-gateWidth / 2 - pillarW, -gateHeight, pillarW, gateHeight + 25);
+    gfx.fillStyle(0x5a4a3a, 0.6);
+    gfx.fillRect(-gateWidth / 2 - pillarW, -gateHeight, 8, gateHeight + 25);
 
     // Right pillar
     gfx.fillStyle(0x4a3a2a, 1);
-    gfx.fillRect(gateWidth / 2, -gateHeight, pillarW, gateHeight + 30);
-    gfx.fillStyle(0x5a4a3a, 0.5);
-    gfx.fillRect(gateWidth / 2, -gateHeight, 10, gateHeight + 30);
+    gfx.fillRect(gateWidth / 2, -gateHeight, pillarW, gateHeight + 25);
+    gfx.fillStyle(0x5a4a3a, 0.6);
+    gfx.fillRect(gateWidth / 2, -gateHeight, 8, gateHeight + 25);
 
     // Top beam
     gfx.fillStyle(0x5a4a3a, 1);
-    gfx.fillRect(-gateWidth / 2 - pillarW - 10, -gateHeight - 20, gateWidth + pillarW * 2 + 20, 25);
+    gfx.fillRect(-gateWidth / 2 - pillarW - 8, -gateHeight - 18, gateWidth + pillarW * 2 + 16, 22);
 
     // Gold trim
-    gfx.lineStyle(4, 0xc9a227, 0.9);
-    gfx.strokeRect(-gateWidth / 2 - pillarW - 10, -gateHeight - 20, gateWidth + pillarW * 2 + 20, 25);
+    gfx.lineStyle(3, 0xc9a227, 0.9);
+    gfx.strokeRect(-gateWidth / 2 - pillarW - 8, -gateHeight - 18, gateWidth + pillarW * 2 + 16, 22);
 
     // Torches
-    if (t > 0.15) {
-      const torchY = -gateHeight + 30;
-      // Glow
-      gfx.fillStyle(0xff6600, 0.3);
-      gfx.fillCircle(-gateWidth / 2 - pillarW / 2, torchY, 20);
-      gfx.fillCircle(gateWidth / 2 + pillarW / 2, torchY, 20);
-      // Flame
-      gfx.fillStyle(0xff9933, 0.9);
-      gfx.fillCircle(-gateWidth / 2 - pillarW / 2, torchY, 10);
-      gfx.fillCircle(gateWidth / 2 + pillarW / 2, torchY, 10);
-      gfx.fillStyle(0xffcc00, 1);
-      gfx.fillCircle(-gateWidth / 2 - pillarW / 2, torchY - 3, 5);
-      gfx.fillCircle(gateWidth / 2 + pillarW / 2, torchY - 3, 5);
-    }
+    const torchY = -gateHeight + 25;
+    gfx.fillStyle(0xff6600, 0.4);
+    gfx.fillCircle(-gateWidth / 2 - pillarW / 2, torchY, 15);
+    gfx.fillCircle(gateWidth / 2 + pillarW / 2, torchY, 15);
+    gfx.fillStyle(0xffaa00, 0.9);
+    gfx.fillCircle(-gateWidth / 2 - pillarW / 2, torchY, 8);
+    gfx.fillCircle(gateWidth / 2 + pillarW / 2, torchY, 8);
 
     gate.container.add(gfx);
 
-    // Word tablets
+    // Word tablets - BIG and readable
     const lanes: Lane[] = ['left', 'center', 'right'];
     const laneWidth = gateWidth / 3;
 
@@ -541,23 +448,25 @@ export class GameScene extends Phaser.Scene {
 
       const tabletGfx = this.add.graphics();
 
-      // Stone tablet
+      // Stone tablet background
       tabletGfx.fillStyle(0x1a1015, 0.95);
-      tabletGfx.fillRoundedRect(x - 60, -90, 120, 85, 8);
+      tabletGfx.fillRoundedRect(x - 70, -85, 140, 90, 8);
 
       // Gold border
       tabletGfx.lineStyle(3, 0xc9a227, 0.9);
-      tabletGfx.strokeRoundedRect(x - 60, -90, 120, 85, 8);
+      tabletGfx.strokeRoundedRect(x - 70, -85, 140, 90, 8);
 
       gate.container.add(tabletGfx);
 
-      const wordText = this.add.text(x, -60, option.word.chinese, {
-        fontSize: '32px',
+      // Chinese word - LARGE font
+      const wordText = this.add.text(x, -55, option.word.chinese, {
+        fontSize: '36px',
         fontFamily: 'Arial',
         color: '#ffffff',
       }).setOrigin(0.5);
 
-      const pinyinText = this.add.text(x, -28, option.word.pinyin, {
+      // Pinyin
+      const pinyinText = this.add.text(x, -20, option.word.pinyin, {
         fontSize: '14px',
         fontFamily: 'Arial',
         color: '#c9a227',
@@ -567,45 +476,36 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  update(_time: number, delta: number): void {
-    const settings = this.difficultySystem.update(this.distance);
+  update(time: number, delta: number): void {
+    // Update difficulty based on CORRECT ANSWERS (not distance)
+    const settings = this.difficultySystem.update(this.scoreSystem.getCorrectAnswers());
     this.gameSpeed = settings.speedMultiplier;
 
-    // Movement speed
-    const zSpeed = BASE_SPEED * this.gameSpeed * delta / 1000;
-    this.distance += zSpeed;
-
-    // Draw base track
-    this.drawTrack();
-
-    // Update track tiles (moving toward player)
-    for (let i = this.trackTiles.length - 1; i >= 0; i--) {
-      this.trackTiles[i].z -= zSpeed * Z_SPEED_MULTIPLIER;
-
-      if (this.trackTiles[i].z < -50) {
-        this.trackTiles[i].graphics.destroy();
-        this.trackTiles.splice(i, 1);
-        this.spawnTrackTile(MAX_Z);
-      }
-    }
-    this.renderTrackTiles();
+    // Update distance for display
+    this.distance += (100 * this.gameSpeed * delta) / 1000;
 
     // Update gates
     for (let i = this.gates3D.length - 1; i >= 0; i--) {
       const gate = this.gates3D[i];
-      gate.z -= zSpeed * Z_SPEED_MULTIPLIER;
+
+      // Progress based on time since spawn
+      const elapsed = time - gate.spawnTime;
+      gate.progress = Math.min(1, elapsed / (GATE_TRAVEL_TIME / this.gameSpeed));
+
       this.renderGate(gate);
 
-      // Collision at z near 50 (where player is)
-      if (gate.z <= 60 && gate.z > 0 && !gate.processed) {
+      // Collision when gate reaches player (progress >= 0.95)
+      if (gate.progress >= 0.95 && !gate.processed) {
         this.processGateCollision(gate);
         gate.processed = true;
       }
 
-      if (gate.z < -100) {
+      // Remove passed gates
+      if (gate.progress >= 1.1) {
         gate.container.destroy();
         this.gates3D.splice(i, 1);
 
+        // Update English word to next gate
         if (this.gates3D.length > 0) {
           this.questionStartTime = this.time.now;
           this.englishWordText.setText(this.gates3D[0].question.correctWord.english);
@@ -613,15 +513,14 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Spawn new gates - when furthest gate has traveled GATE_SPACING distance from horizon
-    const furthestGate = this.gates3D.length > 0 ? Math.max(...this.gates3D.map(g => g.z)) : 0;
-    const spawnThreshold = MAX_Z - 50 - GATE_SPACING; // Spawn when furthest gate passes this point
-    if (this.gates3D.length === 0 || furthestGate < spawnThreshold) {
+    // Spawn new gates based on time
+    const timeSinceLastSpawn = time - this.lastGateSpawnTime;
+    if (this.gates3D.length === 0 || timeSinceLastSpawn > GATE_SPACING_TIME / this.gameSpeed) {
       this.spawnGate();
     }
 
     // Update player shadow
-    this.updatePlayerPosition();
+    this.updatePlayerShadow();
 
     // Update UI
     this.scoreText.setText(this.scoreSystem.getScore().toString());
@@ -666,9 +565,8 @@ export class GameScene extends Phaser.Scene {
 
   private showFeedback(correct: boolean, text: string): void {
     const { width } = this.cameras.main;
-    const baseY = getYFromZ(50);
 
-    const feedback = this.add.text(width / 2, baseY - 80, text, {
+    const feedback = this.add.text(width / 2, PLAYER_Y - 60, text, {
       fontSize: '42px',
       fontFamily: 'Arial Black',
       color: correct ? '#00ff00' : '#ff3333',
@@ -678,7 +576,7 @@ export class GameScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: feedback,
-      y: baseY - 180,
+      y: PLAYER_Y - 140,
       alpha: 0,
       scale: 1.5,
       duration: 900,
@@ -688,7 +586,7 @@ export class GameScene extends Phaser.Scene {
 
   private showNotification(text: string): void {
     const { width, height } = this.cameras.main;
-    const notification = this.add.text(width / 2, height / 2, text, {
+    const notification = this.add.text(width / 2, height / 2 - 50, text, {
       fontSize: '40px',
       fontFamily: 'Arial Black',
       color: '#c9a227',
@@ -709,18 +607,18 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.cameras.main;
 
     const bg = this.add.graphics();
-    bg.fillStyle(0x0a0510, 0.95);
-    bg.fillRoundedRect(width / 2 - 140, height / 2 - 60, 280, 120, 12);
+    bg.fillStyle(0x0a0510, 0.98);
+    bg.fillRoundedRect(width / 2 - 140, height / 2 - 100, 280, 120, 12);
     bg.lineStyle(4, 0xc9a227, 1);
-    bg.strokeRoundedRect(width / 2 - 140, height / 2 - 60, 280, 120, 12);
+    bg.strokeRoundedRect(width / 2 - 140, height / 2 - 100, 280, 120, 12);
 
-    const text = this.add.text(width / 2, height / 2 - 15, `HSK ${level}`, {
+    const text = this.add.text(width / 2, height / 2 - 55, `HSK ${level}`, {
       fontSize: '52px',
       fontFamily: 'Arial Black',
       color: '#c9a227',
     }).setOrigin(0.5);
 
-    const subtext = this.add.text(width / 2, height / 2 + 35, 'LEVEL UP!', {
+    const subtext = this.add.text(width / 2, height / 2 - 5, 'LEVEL UP!', {
       fontSize: '22px',
       fontFamily: 'Arial Black',
       color: '#ffffff',

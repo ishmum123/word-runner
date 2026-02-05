@@ -4,13 +4,16 @@ export interface DifficultySettings {
   decisionTime: number;
 }
 
-const DIFFICULTY_THRESHOLDS = [
-  { distance: 0, hskLevel: 1, speed: 1.0, decisionTime: 3000 },
-  { distance: 500, hskLevel: 2, speed: 1.1, decisionTime: 2700 },
-  { distance: 1500, hskLevel: 3, speed: 1.2, decisionTime: 2400 },
-  { distance: 3000, hskLevel: 4, speed: 1.3, decisionTime: 2100 },
-  { distance: 5000, hskLevel: 5, speed: 1.4, decisionTime: 1800 },
-  { distance: 8000, hskLevel: 6, speed: 1.5, decisionTime: 1500 },
+// HSK level increases every 50 correct answers
+const CORRECT_ANSWERS_PER_LEVEL = 50;
+
+const LEVEL_SETTINGS = [
+  { hskLevel: 1, speed: 1.0, decisionTime: 3000 },
+  { hskLevel: 2, speed: 1.05, decisionTime: 2800 },
+  { hskLevel: 3, speed: 1.1, decisionTime: 2600 },
+  { hskLevel: 4, speed: 1.15, decisionTime: 2400 },
+  { hskLevel: 5, speed: 1.2, decisionTime: 2200 },
+  { hskLevel: 6, speed: 1.25, decisionTime: 2000 },
 ];
 
 export class DifficultySystem {
@@ -29,21 +32,19 @@ export class DifficultySystem {
     this.onLevelChange = callback;
   }
 
-  update(distance: number): DifficultySettings {
+  update(correctAnswers: number): DifficultySettings {
     const previousLevel = this.currentSettings.hskLevel;
 
-    // Find appropriate difficulty tier
-    for (let i = DIFFICULTY_THRESHOLDS.length - 1; i >= 0; i--) {
-      const threshold = DIFFICULTY_THRESHOLDS[i];
-      if (distance >= threshold.distance) {
-        this.currentSettings = {
-          hskLevel: threshold.hskLevel,
-          speedMultiplier: threshold.speed,
-          decisionTime: threshold.decisionTime,
-        };
-        break;
-      }
-    }
+    // Calculate level based on correct answers (50 per level, max level 6)
+    const newLevel = Math.min(6, Math.floor(correctAnswers / CORRECT_ANSWERS_PER_LEVEL) + 1);
+    const levelIndex = newLevel - 1;
+    const settings = LEVEL_SETTINGS[levelIndex];
+
+    this.currentSettings = {
+      hskLevel: settings.hskLevel,
+      speedMultiplier: settings.speed,
+      decisionTime: settings.decisionTime,
+    };
 
     // Notify on level change
     if (this.currentSettings.hskLevel !== previousLevel && this.onLevelChange) {
