@@ -387,19 +387,17 @@ export class GameScene extends Phaser.Scene {
     const p = gate.progress;
     const y = GATE_START_Y + (PLAYER_Y - GATE_START_Y) * p;
 
-    // Scale: start at 0.4 (readable), grow to 1.0
-    const scale = 0.4 + 0.6 * p;
-
+    // NO scaling - gate stays full size throughout
     // Alpha: fade in quickly, stay visible
-    const alpha = Math.min(1, p * 5 + 0.3);
+    const alpha = Math.min(1, p * 3 + 0.5);
 
     gate.container.setPosition(VANISHING_POINT_X, y);
-    gate.container.setScale(scale);
+    gate.container.setScale(1); // Fixed scale - no growing
     gate.container.setAlpha(alpha);
     gate.container.setDepth(100 + Math.floor(p * 100));
 
-    const trackWidth = TRACK_WIDTH_START + (TRACK_WIDTH_END - TRACK_WIDTH_START) * p;
-    const gateWidth = trackWidth / scale;
+    // Fixed gate width - same as track width at player position (fully spread out)
+    const gateWidth = TRACK_WIDTH_END;
     const gateHeight = 100;
 
     const gfx = this.add.graphics();
