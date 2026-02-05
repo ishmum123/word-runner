@@ -488,21 +488,24 @@ export class GameScene extends Phaser.Scene {
     for (let i = this.gates3D.length - 1; i >= 0; i--) {
       const gate = this.gates3D[i];
 
-      // Progress based on time since spawn
+      // Progress based on time since spawn (no cap - allow > 1.0 for removal)
       const elapsed = time - gate.spawnTime;
-      gate.progress = Math.min(1, elapsed / (GATE_TRAVEL_TIME / this.gameSpeed));
+      gate.progress = elapsed / (GATE_TRAVEL_TIME / this.gameSpeed);
 
-      this.renderGate(gate);
+      // Only render if still visible
+      if (gate.progress <= 1.15) {
+        this.renderGate(gate);
+      }
 
-      // Collision when gate reaches player (progress >= 0.95)
-      if (gate.progress >= 0.95 && !gate.processed) {
+      // Collision when gate reaches player (progress >= 0.98)
+      if (gate.progress >= 0.98 && !gate.processed) {
         this.processGateCollision(gate);
         gate.processed = true;
       }
 
       // Remove passed gates
-      if (gate.progress >= 1.1) {
-        gate.container.destroy();
+      if (gate.progress >= 1.15) {
+        gate.container.destroy(true); // true = destroy children too
         this.gates3D.splice(i, 1);
 
         // Update English word to next gate
