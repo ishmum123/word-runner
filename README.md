@@ -2,6 +2,8 @@
 
 A Temple Run-style endless runner game for learning Chinese vocabulary. Match English words with their correct Chinese translations to survive!
 
+**[Play Now](https://ishmum123.github.io/word-runner/)** - No installation required!
+
 ## How to Play
 
 1. An English word appears at the top of the screen
