@@ -72,7 +72,6 @@ export class GameScene extends Phaser.Scene {
 
   private questionStartTime: number = 0;
   private gates3D: Gate3D[] = [];
-  private nextGateZ: number = GATE_SPACING;
 
   private trackTiles: TrackTile[] = [];
   private trackGraphics!: Phaser.GameObjects.Graphics;
@@ -126,7 +125,6 @@ export class GameScene extends Phaser.Scene {
     this.gameSpeed = 1;
     this.currentLane = 'center';
     this.gates3D = [];
-    this.nextGateZ = GATE_SPACING;
     this.trackTiles = [];
   }
 
@@ -455,13 +453,12 @@ export class GameScene extends Phaser.Scene {
 
     const gate: Gate3D = {
       container: this.add.container(VANISHING_POINT_X, HORIZON_Y),
-      z: this.nextGateZ,
+      z: MAX_Z - 50, // Always spawn at the far horizon
       question: question,
       processed: false,
     };
 
     this.gates3D.push(gate);
-    this.nextGateZ += GATE_SPACING;
   }
 
   private renderGate(gate: Gate3D): void {
@@ -616,9 +613,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Spawn new gates
+    // Spawn new gates - when furthest gate has traveled GATE_SPACING distance from horizon
     const furthestGate = this.gates3D.length > 0 ? Math.max(...this.gates3D.map(g => g.z)) : 0;
-    if (furthestGate < GATE_SPACING * 1.5) {
+    const spawnThreshold = MAX_Z - 50 - GATE_SPACING; // Spawn when furthest gate passes this point
+    if (this.gates3D.length === 0 || furthestGate < spawnThreshold) {
       this.spawnGate();
     }
 
