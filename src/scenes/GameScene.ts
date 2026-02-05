@@ -14,9 +14,10 @@ const VANISHING_POINT_X = 240;
 const TRACK_WIDTH_FAR = 30;
 const TRACK_WIDTH_NEAR = 450;
 
-const BASE_SPEED = 100; // Slower base speed
-const GATE_SPACING = 2000; // Much more spacing between gates
-const MAX_Z = 3000; // How far we can see
+const BASE_SPEED = 100;
+const GATE_SPACING = 2000; // Distance between gates
+const MAX_Z = 2500; // How far we can see
+const Z_SPEED_MULTIPLIER = 3; // Controls how fast things approach (tuned for 5-7 sec travel time)
 
 // Get lane X position based on depth (z)
 const getLaneX = (lane: Lane, z: number): number => {
@@ -475,7 +476,7 @@ export class GameScene extends Phaser.Scene {
     const scale = getScaleFromZ(gate.z);
     const t = 1 - gate.z / MAX_Z;
 
-    if (t < 0.03) {
+    if (t < 0.01) {
       gate.container.setVisible(false);
       return;
     }
@@ -483,7 +484,7 @@ export class GameScene extends Phaser.Scene {
     gate.container.setVisible(true);
     gate.container.setPosition(VANISHING_POINT_X, y);
     gate.container.setScale(scale);
-    gate.container.setAlpha(0.3 + 0.7 * t);
+    gate.container.setAlpha(0.2 + 0.8 * t);
     gate.container.setDepth(1000 - gate.z);
 
     const trackWidth = TRACK_WIDTH_FAR + (TRACK_WIDTH_NEAR - TRACK_WIDTH_FAR) * t;
@@ -582,7 +583,7 @@ export class GameScene extends Phaser.Scene {
 
     // Update track tiles (moving toward player)
     for (let i = this.trackTiles.length - 1; i >= 0; i--) {
-      this.trackTiles[i].z -= zSpeed * 15;
+      this.trackTiles[i].z -= zSpeed * Z_SPEED_MULTIPLIER;
 
       if (this.trackTiles[i].z < -50) {
         this.trackTiles[i].graphics.destroy();
@@ -595,7 +596,7 @@ export class GameScene extends Phaser.Scene {
     // Update gates
     for (let i = this.gates3D.length - 1; i >= 0; i--) {
       const gate = this.gates3D[i];
-      gate.z -= zSpeed * 15;
+      gate.z -= zSpeed * Z_SPEED_MULTIPLIER;
       this.renderGate(gate);
 
       // Collision at z near 50 (where player is)
