@@ -15,8 +15,8 @@ const TRACK_WIDTH_START = 80; // Width at spawn point
 const TRACK_WIDTH_END = 420; // Width at player
 
 // Timing
-const GATE_TRAVEL_TIME = 3000; // 3 seconds to reach player
-const GATE_SPACING_TIME = 3500; // Time between gate spawns (ms)
+const GATE_TRAVEL_TIME = 4000; // 4 seconds to reach player
+const GATE_SPACING_TIME = 4500; // Time between gate spawns (ms)
 
 // Get lane X position based on progress (0 = top, 1 = player)
 const getLaneX = (lane: Lane, progress: number): number => {
