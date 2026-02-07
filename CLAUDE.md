@@ -4,7 +4,7 @@ This file provides context for AI agents working on this codebase.
 
 ## Project Overview
 
-Word Runner is a Phaser 3 game built with TypeScript and Vite. It's an endless runner where players learn Chinese vocabulary by selecting correct translations.
+Word Runner is a 3D game built with Three.js, TypeScript, and Vite. It's an endless runner where players learn Chinese vocabulary by selecting correct translations. The game features bidirectional question modes (Chinese↔English) and supports custom vocabulary via Anki CSV import.
 
 ## Build & Run Commands
 
@@ -14,27 +14,32 @@ npm run dev      # Start dev server (http://localhost:5173)
 npm run build    # Production build (outputs to dist/)
 ```
 
+## Pre-Push Checklist
+
+**IMPORTANT: Always run `npm run build` before pushing to verify the code compiles without errors.** GitHub Actions will fail on TypeScript errors, so catch them locally first.
+
 ## Architecture
 
 ### Core Game Loop
 
-The game uses Phaser 3's scene system:
+The game uses Three.js for 3D rendering with HTML overlay for UI:
 
-1. **TitleScene** → Start screen, press START or SPACE/ENTER
-2. **GameScene** → Main gameplay loop
-3. **GameOverScene** → Shows stats, retry or menu options
+1. **Title Screen** (`src/game3d/index.ts`) → Start screen with CSV upload option
+2. **Game3D** (`src/game3d/Game3D.ts`) → Main 3D gameplay loop
+3. **Game Over** → Shows stats overlay, retry or menu options
 
-### Gate System (GameScene.ts)
+### Gate System (Game3D.ts)
 
-Gates are the core mechanic - they contain Chinese word options and move toward the player.
+Gates are the core mechanic - 3D arch structures with word panels that move toward the player.
 
 ```typescript
 interface Gate3D {
-  container: Phaser.GameObjects.Container;  // Visual elements
-  progress: number;      // 0 = spawned, 1 = at player
-  question: WordQuestion; // The word data
-  processed: boolean;    // Has collision been handled?
-  spawnTime: number;     // When gate was created
+  group: THREE.Group;      // 3D group containing all gate elements
+  progress: number;        // 0 = spawned, 1 = at player
+  question: WordQuestion;  // The word data
+  processed: boolean;      // Has collision been handled?
+  spawnTime: number;       // When gate was created
+  textMeshes: THREE.Mesh[]; // Text panels for each option
 }
 ```
 
@@ -74,17 +79,19 @@ Speed multiplier increases slightly with each level.
 
 | File | Purpose |
 |------|---------|
-| `src/scenes/GameScene.ts` | Main gameplay - gates, player, collision |
+| `src/game3d/Game3D.ts` | Main 3D gameplay - gates, player, collision |
+| `src/game3d/index.ts` | Title screen and game initialization |
 | `src/systems/DifficultySystem.ts` | HSK progression logic |
 | `src/systems/WordManager.ts` | Word selection and distractors |
 | `src/systems/ScoreSystem.ts` | Points, streaks, accuracy |
+| `src/utils/csvParser.ts` | Anki CSV import for custom vocabulary |
 | `src/data/hsk1-6.ts` | Vocabulary databases (~100 words each) |
 | `src/audio/SoundManager.ts` | Synthesized sound effects |
 
 ## Common Modifications
 
 ### Adjust Game Speed
-Edit `GATE_TRAVEL_TIME` and `GATE_SPACING_TIME` in GameScene.ts.
+Edit `GATE_TRAVEL_TIME` and `GATE_SPACING_TIME` in Game3D.ts.
 
 ### Change HSK Progression
 Edit `CORRECT_ANSWERS_PER_LEVEL` in DifficultySystem.ts (default: 50).
@@ -96,15 +103,15 @@ Add to the appropriate `src/data/hskN.ts` file:
 ```
 
 ### Modify Gate Appearance
-The `renderGate()` method in GameScene.ts handles all gate visuals.
+The `createGate()` method in Game3D.ts handles all gate visuals including panels, text, and frame.
 
-### Adjust Player Position
-Change `PLAYER_Y` constant in GameScene.ts.
+### Adjust Player/Camera Position
+Change `PLAYER_Z` constant or camera position in `setupScene()` in Game3D.ts.
 
 ## Important Patterns
 
-### Gate Rendering
-Gates are re-rendered every frame (container cleared and rebuilt). This allows smooth position updates but creates objects each frame - keep render logic efficient.
+### Three.js Groups
+All gate elements are added to a THREE.Group, which handles positioning. When destroying gates, traverse and dispose geometries/materials to prevent memory leaks.
 
 ### TypeScript Strict Mode
 Project uses `verbatimModuleSyntax` - use `import type` for type-only imports:
@@ -113,8 +120,8 @@ import type { Word } from '../types';  // Correct
 import { Word } from '../types';        // Will error
 ```
 
-### Phaser Containers
-All gate elements are added to a container, which handles positioning/scaling. When destroying gates, use `container.destroy(true)` to destroy children.
+### Canvas Textures for Text
+Text is rendered to HTML canvas elements, then used as Three.js textures on planes. Use `LinearFilter` and disable mipmaps for crisp text.
 
 ## Gotchas
 
@@ -124,7 +131,9 @@ All gate elements are added to a container, which handles positioning/scaling. W
 
 3. **Type imports** - Use `import type` for interfaces/types due to tsconfig settings
 
-4. **Container children** - When calling `container.removeAll(true)`, the `true` destroys children
+4. **Memory leaks** - Always dispose Three.js geometries and materials when removing objects
+
+5. **Perspective scaling** - Gates appear larger as they approach due to perspective camera - this is expected 3D behavior
 
 ## Testing Locally
 
