@@ -73,6 +73,12 @@ export class GameScene extends Phaser.Scene {
   private isSwiping: boolean = false;
   private useCustomDeck: boolean = false;
 
+  // Pause state
+  private isPaused: boolean = false;
+  private pauseOverlay!: Phaser.GameObjects.Container;
+  private pauseButton!: Phaser.GameObjects.Container;
+  private pausedTime: number = 0;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -311,6 +317,145 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial',
       color: '#ffffff',
     }).setOrigin(1, 0);
+
+    // Pause button
+    this.createPauseButton();
+
+    // Pause overlay (hidden initially)
+    this.createPauseOverlay();
+  }
+
+  private createPauseButton(): void {
+    const { width } = this.cameras.main;
+
+    this.pauseButton = this.add.container(width / 2, 32);
+    const pauseBg = this.add.graphics();
+    pauseBg.fillStyle(0x2a2030, 0.8);
+    pauseBg.fillRoundedRect(-20, -15, 40, 30, 6);
+
+    // Pause icon (two vertical bars)
+    const pauseIcon = this.add.graphics();
+    pauseIcon.fillStyle(0xc9a227, 1);
+    pauseIcon.fillRect(-8, -8, 5, 16);
+    pauseIcon.fillRect(3, -8, 5, 16);
+
+    this.pauseButton.add([pauseBg, pauseIcon]);
+    this.pauseButton.setSize(40, 30);
+    this.pauseButton.setInteractive({ useHandCursor: true });
+    this.pauseButton.setDepth(1000);
+
+    this.pauseButton.on('pointerdown', () => {
+      this.togglePause();
+    });
+  }
+
+  private createPauseOverlay(): void {
+    const { width, height } = this.cameras.main;
+
+    this.pauseOverlay = this.add.container(0, 0);
+    this.pauseOverlay.setDepth(2000);
+    this.pauseOverlay.setVisible(false);
+
+    // Semi-transparent background
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.7);
+    overlay.fillRect(0, 0, width, height);
+    this.pauseOverlay.add(overlay);
+
+    // Pause menu panel
+    const panel = this.add.graphics();
+    panel.fillStyle(0x1a1a2e, 0.95);
+    panel.fillRoundedRect(width / 2 - 120, height / 2 - 120, 240, 240, 16);
+    panel.lineStyle(3, 0xc9a227, 1);
+    panel.strokeRoundedRect(width / 2 - 120, height / 2 - 120, 240, 240, 16);
+    this.pauseOverlay.add(panel);
+
+    // Paused title
+    const title = this.add.text(width / 2, height / 2 - 80, 'PAUSED', {
+      fontSize: '36px',
+      fontFamily: 'Arial Black',
+      color: '#c9a227',
+    }).setOrigin(0.5);
+    this.pauseOverlay.add(title);
+
+    // Resume button
+    const resumeButton = this.createPauseMenuButton(width / 2, height / 2, 'RESUME', 0x2a6a30, () => {
+      this.togglePause();
+    });
+    this.pauseOverlay.add(resumeButton);
+
+    // Quit button
+    const quitButton = this.createPauseMenuButton(width / 2, height / 2 + 70, 'QUIT', 0x6a2a2a, () => {
+      this.isPaused = false;
+      this.scene.start('TitleScene');
+    });
+    this.pauseOverlay.add(quitButton);
+
+    // Instructions
+    const hint = this.add.text(width / 2, height / 2 + 130, 'Press ESC or P to resume', {
+      fontSize: '12px',
+      fontFamily: 'Arial',
+      color: '#666666',
+    }).setOrigin(0.5);
+    this.pauseOverlay.add(hint);
+  }
+
+  private createPauseMenuButton(x: number, y: number, text: string, color: number, callback: () => void): Phaser.GameObjects.Container {
+    const button = this.add.container(x, y);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(color, 1);
+    bg.fillRoundedRect(-80, -22, 160, 44, 10);
+
+    const label = this.add.text(0, 0, text, {
+      fontSize: '20px',
+      fontFamily: 'Arial Black',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+
+    button.add([bg, label]);
+    button.setSize(160, 44);
+    button.setInteractive({ useHandCursor: true });
+
+    const hoverColor = Phaser.Display.Color.ValueToColor(color).lighten(20).color;
+
+    button.on('pointerover', () => {
+      bg.clear();
+      bg.fillStyle(hoverColor, 1);
+      bg.fillRoundedRect(-80, -22, 160, 44, 10);
+    });
+
+    button.on('pointerout', () => {
+      bg.clear();
+      bg.fillStyle(color, 1);
+      bg.fillRoundedRect(-80, -22, 160, 44, 10);
+    });
+
+    button.on('pointerdown', callback);
+
+    return button;
+  }
+
+  private togglePause(): void {
+    this.isPaused = !this.isPaused;
+    this.pauseOverlay.setVisible(this.isPaused);
+
+    if (this.isPaused) {
+      // Store the time when paused
+      this.pausedTime = this.time.now;
+      // Pause all tweens
+      this.tweens.pauseAll();
+    } else {
+      // Adjust spawn times to account for pause duration
+      const pauseDuration = this.time.now - this.pausedTime;
+      this.lastGateSpawnTime += pauseDuration;
+      this.questionStartTime += pauseDuration;
+      for (const gate of this.gates3D) {
+        gate.spawnTime += pauseDuration;
+      }
+      // Resume all tweens
+      this.tweens.resumeAll();
+    }
   }
 
   private updateLivesDisplay(): void {
@@ -335,13 +480,19 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-D', () => this.moveToLane('right'));
     this.input.keyboard?.on('keydown-RIGHT', () => this.moveToLane('right'));
 
+    // Pause controls
+    this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
+    this.input.keyboard?.on('keydown-P', () => this.togglePause());
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.isPaused) return;
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
       this.isSwiping = true;
     });
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.isPaused) return;
       if (!this.isSwiping) return;
       this.isSwiping = false;
 
@@ -358,7 +509,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private moveToLane(lane: Lane): void {
-    if (this.isMoving) return;
+    if (this.isMoving || this.isPaused) return;
     this.currentLane = lane;
     this.isMoving = true;
     soundManager.play('whoosh');
@@ -503,6 +654,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    // Skip updates when paused
+    if (this.isPaused) return;
+
     // Update difficulty based on CORRECT ANSWERS (not distance)
     const settings = this.difficultySystem.update(this.scoreSystem.getCorrectAnswers());
     this.gameSpeed = settings.speedMultiplier;
