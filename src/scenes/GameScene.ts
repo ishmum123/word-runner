@@ -582,10 +582,10 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       soundManager.play('wrong');
-      // Show correct answer in the appropriate language
+      // Show correct answer in the appropriate language (with pinyin for Chinese)
       const correctAnswer = gate.question.mode === 'chinese-to-english'
         ? gate.question.correctWord.english
-        : gate.question.correctWord.chinese;
+        : `${gate.question.correctWord.chinese}\n${gate.question.correctWord.pinyin}`;
       this.showFeedback(false, correctAnswer);
       this.lives--;
       this.updateLivesDisplay();
