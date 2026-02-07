@@ -28,6 +28,10 @@ export class Game3D {
   private mixer!: THREE.AnimationMixer;
   private runAction!: THREE.AnimationAction;
   private currentLane: Lane = 'center';
+  private leftArm!: THREE.Mesh;
+  private rightArm!: THREE.Mesh;
+  private leftLeg!: THREE.Mesh;
+  private rightLeg!: THREE.Mesh;
   private targetX: number = 0;
   private isMoving: boolean = false;
 
@@ -63,7 +67,7 @@ export class Game3D {
   private readonly LANE_WIDTH = 2;
   private readonly GATE_TRAVEL_TIME = 4000;
   private readonly GATE_SPACING_TIME = 4500;
-  private readonly GATE_START_Z = -50;
+  private readonly GATE_START_Z = -20; // Closer spawn for better visibility
   private readonly PLAYER_Z = 0;
 
   constructor(container: HTMLElement, useCustomDeck: boolean = false) {
@@ -115,11 +119,10 @@ export class Game3D {
     this.camera.position.set(0, 5, 8);
     this.camera.lookAt(0, 1, -10);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = false; // Disable shadows to prevent jitter
     this.container.appendChild(this.renderer.domElement);
 
     window.addEventListener('resize', () => this.onResize());
@@ -132,8 +135,8 @@ export class Game3D {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 5);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 50;
     directionalLight.shadow.camera.left = -20;
@@ -202,42 +205,161 @@ export class Game3D {
   }
 
   private async loadPlayer(): Promise<void> {
+    // Try to load Mixamo animation for the character
     const loader = new FBXLoader();
-
     try {
-      const fbx = await loader.loadAsync('/word-runner/assets/3d/runner.fbx');
-      this.player = fbx;
-      this.player.scale.set(0.02, 0.02, 0.02);
-      this.player.position.set(0, 0, this.PLAYER_Z);
-      this.player.rotation.y = Math.PI; // Face away from camera
+      const fbx = await loader.loadAsync('./Run Forward.fbx');
 
-      this.player.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-
-      this.scene.add(this.player);
-
-      // Setup animation
-      this.mixer = new THREE.AnimationMixer(this.player);
-      if (fbx.animations.length > 0) {
-        this.runAction = this.mixer.clipAction(fbx.animations[0]);
-        this.runAction.play();
+      // Check if FBX has animations
+      if (fbx.animations && fbx.animations.length > 0) {
+        // Create our stylized player with a skeleton that matches Mixamo
+        this.createAnimatedPlayer(fbx.animations[0]);
+      } else {
+        this.createStylizedPlayer();
       }
-    } catch (error) {
-      console.error('Failed to load player model:', error);
-      // Fallback to simple box
-      const geometry = new THREE.BoxGeometry(0.5, 1.5, 0.3);
-      const material = new THREE.MeshStandardMaterial({ color: 0xc04040 });
-      const fallbackPlayer = new THREE.Mesh(geometry, material);
-      fallbackPlayer.position.y = 0.75;
-      this.player = new THREE.Group();
-      this.player.add(fallbackPlayer);
-      this.player.position.set(0, 0, this.PLAYER_Z);
-      this.scene.add(this.player);
+    } catch (e) {
+      console.log('Could not load FBX animation, using static player');
+      this.createStylizedPlayer();
     }
+  }
+
+  private createAnimatedPlayer(animation: THREE.AnimationClip): void {
+    // Create a simple rigged character
+    this.player = new THREE.Group();
+
+    // Create bones for a humanoid
+    const hipBone = new THREE.Bone();
+    hipBone.position.y = 1;
+
+    const spineBone = new THREE.Bone();
+    spineBone.position.y = 0.4;
+    hipBone.add(spineBone);
+
+    const headBone = new THREE.Bone();
+    headBone.position.y = 0.5;
+    spineBone.add(headBone);
+
+    const leftLegBone = new THREE.Bone();
+    leftLegBone.position.set(-0.1, -0.1, 0);
+    hipBone.add(leftLegBone);
+
+    const rightLegBone = new THREE.Bone();
+    rightLegBone.position.set(0.1, -0.1, 0);
+    hipBone.add(rightLegBone);
+
+    // Since Mixamo animations need matching bone names, let's just do procedural animation
+    this.createStylizedPlayer();
+
+    // Add procedural running animation
+    this.addProceduralRunAnimation();
+  }
+
+  private createStylizedPlayer(): void {
+    this.player = new THREE.Group();
+
+    // Materials
+    const skinMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99, roughness: 0.8 });
+    const shirtMaterial = new THREE.MeshStandardMaterial({ color: 0xc04040, roughness: 0.7 });
+    const pantsMaterial = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.8 });
+    const hairMaterial = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.9 });
+    const shoeMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+
+    // Head
+    const headGeometry = new THREE.SphereGeometry(0.22, 16, 16);
+    const head = new THREE.Mesh(headGeometry, skinMaterial);
+    head.position.y = 1.75;
+    head.castShadow = true;
+    this.player.add(head);
+
+    // Hair (back of head visible)
+    const hairGeometry = new THREE.SphereGeometry(0.24, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+    hair.position.y = 1.8;
+    hair.rotation.x = Math.PI;
+    hair.castShadow = true;
+    this.player.add(hair);
+
+    // Torso
+    const torsoGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.6, 8);
+    const torso = new THREE.Mesh(torsoGeometry, shirtMaterial);
+    torso.position.y = 1.3;
+    torso.castShadow = true;
+    this.player.add(torso);
+
+    // Arms
+    const armGeometry = new THREE.CylinderGeometry(0.07, 0.06, 0.5, 8);
+
+    this.leftArm = new THREE.Mesh(armGeometry, shirtMaterial);
+    this.leftArm.position.set(-0.32, 1.35, 0);
+    this.leftArm.rotation.z = 0.3;
+    this.player.add(this.leftArm);
+
+    this.rightArm = new THREE.Mesh(armGeometry, shirtMaterial);
+    this.rightArm.position.set(0.32, 1.35, 0);
+    this.rightArm.rotation.z = -0.3;
+    this.player.add(this.rightArm);
+
+    // Hips
+    const hipsGeometry = new THREE.CylinderGeometry(0.2, 0.18, 0.25, 8);
+    const hips = new THREE.Mesh(hipsGeometry, pantsMaterial);
+    hips.position.y = 0.9;
+    hips.castShadow = true;
+    this.player.add(hips);
+
+    // Legs
+    const legGeometry = new THREE.CylinderGeometry(0.09, 0.07, 0.55, 8);
+
+    this.leftLeg = new THREE.Mesh(legGeometry, pantsMaterial);
+    this.leftLeg.position.set(-0.1, 0.5, 0);
+    this.player.add(this.leftLeg);
+
+    this.rightLeg = new THREE.Mesh(legGeometry, pantsMaterial);
+    this.rightLeg.position.set(0.1, 0.5, 0);
+    this.player.add(this.rightLeg);
+
+    // Shoes
+    const shoeGeometry = new THREE.BoxGeometry(0.12, 0.1, 0.22);
+
+    const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+    leftShoe.position.set(-0.1, 0.05, 0.03);
+    leftShoe.castShadow = true;
+    this.player.add(leftShoe);
+
+    const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+    rightShoe.position.set(0.1, 0.05, 0.03);
+    rightShoe.castShadow = true;
+    this.player.add(rightShoe);
+
+    // Position player
+    this.player.position.set(0, 0, this.PLAYER_Z);
+    this.player.rotation.y = Math.PI; // Face away from camera
+    this.scene.add(this.player);
+  }
+
+  private updateRunnerAnimation(time: number): void {
+    if (!this.player || !this.leftLeg || !this.rightLeg) return;
+
+    // Running animation - swing limbs
+    const speed = 0.012;
+    const legSwing = Math.sin(time * speed) * 0.5;
+    const armSwing = Math.sin(time * speed) * 0.4;
+
+    // Legs swing opposite to each other
+    this.leftLeg.rotation.x = legSwing;
+    this.rightLeg.rotation.x = -legSwing;
+
+    // Arms swing opposite to legs (natural running motion)
+    if (this.leftArm && this.rightArm) {
+      this.leftArm.rotation.x = -armSwing;
+      this.rightArm.rotation.x = armSwing;
+    }
+
+    // Slight body bob
+    this.player.position.y = Math.abs(Math.sin(time * speed * 2)) * 0.05;
+  }
+
+  private addProceduralRunAnimation(): void {
+    // Animation is handled in updateRunnerAnimation
   }
 
   private createUI(): void {
@@ -458,96 +580,140 @@ export class Game3D {
     const group = new THREE.Group();
     group.position.z = this.GATE_START_Z;
 
-    // Gate frame (pillars)
-    const pillarGeometry = new THREE.BoxGeometry(0.3, 4, 0.3);
-    const pillarMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a3a2a,
-      roughness: 0.7,
-      metalness: 0.3
+    // Gate frame (pillars) - from ground to overhead arch
+    const pillarGeometry = new THREE.BoxGeometry(0.4, 7, 0.3);
+    const pillarMaterial = new THREE.MeshBasicMaterial({
+      color: 0xc9a227
     });
 
     const leftPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-    leftPillar.position.set(-4, 2, 0);
-    leftPillar.castShadow = true;
+    leftPillar.position.set(-6, 3.5, 0);
     group.add(leftPillar);
 
     const rightPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-    rightPillar.position.set(4, 2, 0);
-    rightPillar.castShadow = true;
+    rightPillar.position.set(6, 3.5, 0);
     group.add(rightPillar);
 
-    // Top beam
-    const beamGeometry = new THREE.BoxGeometry(8.6, 0.4, 0.3);
-    const beamMaterial = new THREE.MeshStandardMaterial({
-      color: 0xc9a227,
-      roughness: 0.5,
-      metalness: 0.5,
-      emissive: 0xc9a227,
-      emissiveIntensity: 0.2
+    // Top beam - spans across all panels
+    const beamGeometry = new THREE.BoxGeometry(12.4, 0.4, 0.3);
+    const beamMaterial = new THREE.MeshBasicMaterial({
+      color: 0xc9a227
     });
     const topBeam = new THREE.Mesh(beamGeometry, beamMaterial);
-    topBeam.position.set(0, 4, 0);
+    topBeam.position.set(0, 7.2, 0);
     group.add(topBeam);
 
-    // Word panels
+    // Bottom beam - just above player head
+    const bottomBeam = new THREE.Mesh(beamGeometry, beamMaterial);
+    bottomBeam.position.set(0, 2.5, 0);
+    group.add(bottomBeam);
+
+    // Word panels - very large for readability
     const textMeshes: THREE.Mesh[] = [];
     const lanes: Lane[] = ['left', 'center', 'right'];
     const isChineseToEnglish = question.mode === 'chinese-to-english';
 
     question.options.forEach((option) => {
       const laneIndex = lanes.indexOf(option.lane);
-      const x = (laneIndex - 1) * this.LANE_WIDTH;
+      const x = (laneIndex - 1) * 4; // Spacing of 4 units between panel centers
 
-      // Panel background
-      const panelGeometry = new THREE.BoxGeometry(1.8, 1.2, 0.1);
-      const panelMaterial = new THREE.MeshStandardMaterial({
-        color: 0x1a1015,
-        roughness: 0.9,
-        metalness: 0.1
+      // Panel background - between bottom and top beams
+      const panelGeometry = new THREE.PlaneGeometry(3.8, 4.3);
+      const panelMaterial = new THREE.MeshBasicMaterial({
+        color: 0x0a0510
       });
       const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-      panel.position.set(x, 2.5, 0.2);
+      panel.position.set(x, 4.85, 0.05);
       group.add(panel);
 
-      // Gold border for panel
-      const borderGeometry = new THREE.BoxGeometry(1.9, 1.3, 0.05);
-      const borderMaterial = new THREE.MeshStandardMaterial({
-        color: 0xc9a227,
-        emissive: 0xc9a227,
-        emissiveIntensity: 0.3
-      });
-      const border = new THREE.Mesh(borderGeometry, borderMaterial);
-      border.position.set(x, 2.5, 0.15);
-      group.add(border);
-
-      // Create text using canvas texture
+      // Create text using high-res canvas texture
       const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 128;
+      canvas.width = 512;
+      canvas.height = 384;
       const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#1a1015';
-      ctx.fillRect(0, 0, 256, 128);
+
+      // Dark background
+      ctx.fillStyle = '#0a0510';
+      ctx.fillRect(0, 0, 512, 384);
+
+      // Center-aligned horizontally, middle-aligned vertically
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
 
       if (isChineseToEnglish) {
+        // English word - wrap text if needed
+        const word = option.word.english;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 10;
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 28px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(option.word.english, 128, 75);
+
+        // Calculate font size and wrap text
+        const maxWidth = 460;
+        let fontSize = 64;
+        ctx.font = `bold ${fontSize}px Arial`;
+
+        // Wrap words into lines
+        const words = word.split(' ');
+        const lines: string[] = [];
+        let currentLine = '';
+
+        for (const w of words) {
+          const testLine = currentLine ? `${currentLine} ${w}` : w;
+          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = w;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) lines.push(currentLine);
+
+        // Shrink font for long single words or many lines
+        if (lines.length === 1) {
+          while (fontSize > 28 && ctx.measureText(lines[0]).width > maxWidth) {
+            fontSize -= 2;
+            ctx.font = `bold ${fontSize}px Arial`;
+          }
+        } else if (lines.length > 2) {
+          fontSize = 42;
+          ctx.font = `bold ${fontSize}px Arial`;
+        } else if (lines.length === 2) {
+          fontSize = 52;
+          ctx.font = `bold ${fontSize}px Arial`;
+        }
+
+        // Draw lines vertically centered
+        const lineHeight = fontSize * 1.3;
+        const totalHeight = lineHeight * lines.length;
+        const startY = 192 - totalHeight / 2 + lineHeight / 2;
+
+        lines.forEach((line, i) => {
+          ctx.fillText(line, 256, startY + i * lineHeight);
+        });
       } else {
+        // Chinese character - centered
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 15;
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 48px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(option.word.chinese, 128, 60);
+        ctx.font = 'bold 100px Arial';
+        ctx.fillText(option.word.chinese, 256, 150);
+
+        // Pinyin below
+        ctx.shadowColor = '#c9a227';
+        ctx.shadowBlur = 8;
         ctx.fillStyle = '#c9a227';
-        ctx.font = '20px Arial';
-        ctx.fillText(option.word.pinyin, 128, 100);
+        ctx.font = 'bold 40px Arial';
+        ctx.fillText(option.word.pinyin, 256, 260);
       }
 
       const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
       const textMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-      const textGeometry = new THREE.PlaneGeometry(1.6, 0.8);
+      const textGeometry = new THREE.PlaneGeometry(3.6, 4.1);
       const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-      textMesh.position.set(x, 2.5, 0.26);
+      textMesh.position.set(x, 4.85, 0.1);
       group.add(textMesh);
       textMeshes.push(textMesh);
     });
@@ -762,14 +928,18 @@ export class Game3D {
       }
     }
 
+    // Runner bob animation
+    this.updateRunnerAnimation(now);
+
     // Update gates
     for (let i = this.gates.length - 1; i >= 0; i--) {
       const gate = this.gates[i];
       const elapsed = now - gate.spawnTime;
       gate.progress = elapsed / (this.GATE_TRAVEL_TIME / this.gameSpeed);
 
-      // Move gate towards player
-      gate.group.position.z = this.GATE_START_Z + (this.PLAYER_Z - this.GATE_START_Z) * gate.progress;
+      // Move gate towards player - round to reduce floating point jitter
+      const targetZ = this.GATE_START_Z + (this.PLAYER_Z - this.GATE_START_Z) * gate.progress;
+      gate.group.position.z = Math.round(targetZ * 100) / 100;
 
       // Check collision
       if (gate.progress >= 0.98 && !gate.processed) {
