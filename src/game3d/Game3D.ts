@@ -26,7 +26,6 @@ export class Game3D {
   // Player
   private player!: THREE.Group;
   private mixer!: THREE.AnimationMixer;
-  private runAction!: THREE.AnimationAction;
   private currentLane: Lane = 'center';
   private leftArm!: THREE.Mesh;
   private rightArm!: THREE.Mesh;
@@ -223,7 +222,7 @@ export class Game3D {
     }
   }
 
-  private createAnimatedPlayer(animation: THREE.AnimationClip): void {
+  private createAnimatedPlayer(_animation: THREE.AnimationClip): void {
     // Create a simple rigged character
     this.player = new THREE.Group();
 
