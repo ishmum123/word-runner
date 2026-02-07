@@ -575,12 +575,15 @@ export class GameScene extends Phaser.Scene {
       strokeThickness: 5,
     }).setOrigin(0.5);
 
+    // Show for 3 seconds on wrong answer, 0.9s on correct
+    const duration = correct ? 900 : 3000;
+
     this.tweens.add({
       targets: feedback,
       y: PLAYER_Y - 140,
       alpha: 0,
       scale: 1.5,
-      duration: 900,
+      duration: duration,
       onComplete: () => feedback.destroy(),
     });
   }
