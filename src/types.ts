@@ -28,6 +28,7 @@ export interface GameStats {
   totalAnswers: number;
   maxStreak: number;
   highestHSK: number;
+  useCustomDeck?: boolean;
 }
 
 export type Lane = 'left' | 'center' | 'right';

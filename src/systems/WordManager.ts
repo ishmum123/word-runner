@@ -11,9 +11,20 @@ export interface WordQuestion {
 export class WordManager {
   private recentWords: string[] = [];
   private readonly maxRecentWords = 20;
+  private customWords: Word[] | null = null;
+
+  setCustomWords(words: Word[]): void {
+    this.customWords = words;
+  }
+
+  hasCustomWords(): boolean {
+    return this.customWords !== null && this.customWords.length > 0;
+  }
 
   generateQuestion(hskLevel: number): WordQuestion {
-    const words = this.getAvailableWords(hskLevel);
+    const words = this.customWords && this.customWords.length > 0
+      ? this.customWords
+      : this.getAvailableWords(hskLevel);
 
     // Select correct word (not recently used)
     const availableWords = words.filter(w => !this.recentWords.includes(w.chinese));
@@ -98,5 +109,9 @@ export class WordManager {
 
   reset(): void {
     this.recentWords = [];
+  }
+
+  clearCustomWords(): void {
+    this.customWords = null;
   }
 }

@@ -4,6 +4,7 @@ import { WordManager, type WordQuestion } from '../systems/WordManager';
 import { ScoreSystem } from '../systems/ScoreSystem';
 import { DifficultySystem } from '../systems/DifficultySystem';
 import { soundManager } from '../audio/SoundManager';
+import { loadCustomDeck } from '../utils/csvParser';
 
 // Layout constants
 const GATE_START_Y = 180; // Gates appear just below English word
@@ -70,9 +71,14 @@ export class GameScene extends Phaser.Scene {
   private swipeStartX: number = 0;
   private swipeStartY: number = 0;
   private isSwiping: boolean = false;
+  private useCustomDeck: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  init(data: { useCustomDeck?: boolean }): void {
+    this.useCustomDeck = data?.useCustomDeck ?? false;
   }
 
   create(): void {
@@ -89,6 +95,14 @@ export class GameScene extends Phaser.Scene {
     this.wordManager = new WordManager();
     this.scoreSystem = new ScoreSystem();
     this.difficultySystem = new DifficultySystem();
+
+    // Load custom deck if enabled
+    if (this.useCustomDeck) {
+      const customWords = loadCustomDeck();
+      if (customWords && customWords.length > 0) {
+        this.wordManager.setCustomWords(customWords);
+      }
+    }
 
     this.difficultySystem.setLevelChangeCallback((newLevel) => {
       soundManager.play('levelUp');
@@ -540,7 +554,7 @@ export class GameScene extends Phaser.Scene {
     // Update UI
     this.scoreText.setText(this.scoreSystem.getScore().toString());
     this.distanceText.setText(`${Math.floor(this.distance)}m`);
-    this.hskText.setText(`HSK ${settings.hskLevel}`);
+    this.hskText.setText(this.wordManager.hasCustomWords() ? 'Custom' : `HSK ${settings.hskLevel}`);
 
     const streak = this.scoreSystem.getStreak();
     this.streakText.setText(streak >= 3 ? `${streak} STREAK!` : '');
@@ -675,6 +689,7 @@ export class GameScene extends Phaser.Scene {
       totalAnswers: this.scoreSystem.getTotalAnswers(),
       maxStreak: this.scoreSystem.getMaxStreak(),
       highestHSK: this.difficultySystem.getCurrentSettings().hskLevel,
+      useCustomDeck: this.wordManager.hasCustomWords(),
     };
 
     this.scene.start('GameOverScene', stats);

@@ -74,9 +74,14 @@ export class GameOverScene extends Phaser.Scene {
     this.add.text(60, statsStartY + lineHeight * 4, 'Best Streak', statsConfig);
     this.add.text(width - 60, statsStartY + lineHeight * 4, `${this.stats.maxStreak}`, valueConfig).setOrigin(1, 0);
 
-    // Highest HSK Level
-    this.add.text(60, statsStartY + lineHeight * 5, 'Highest HSK', statsConfig);
-    this.add.text(width - 60, statsStartY + lineHeight * 5, `HSK ${this.stats.highestHSK}`, valueConfig).setOrigin(1, 0);
+    // Highest HSK Level / Custom Deck
+    if (this.stats.useCustomDeck) {
+      this.add.text(60, statsStartY + lineHeight * 5, 'Deck', statsConfig);
+      this.add.text(width - 60, statsStartY + lineHeight * 5, 'Custom', valueConfig).setOrigin(1, 0);
+    } else {
+      this.add.text(60, statsStartY + lineHeight * 5, 'Highest HSK', statsConfig);
+      this.add.text(width - 60, statsStartY + lineHeight * 5, `HSK ${this.stats.highestHSK}`, valueConfig).setOrigin(1, 0);
+    }
 
     // Performance message
     let message = '';
@@ -107,7 +112,7 @@ export class GameOverScene extends Phaser.Scene {
 
     // Retry button
     this.createButton(width / 2 - 110, buttonY, 'RETRY', 0xe94560, () => {
-      this.scene.start('GameScene');
+      this.scene.start('GameScene', { useCustomDeck: this.stats.useCustomDeck });
     });
 
     // Menu button
@@ -117,11 +122,11 @@ export class GameOverScene extends Phaser.Scene {
 
     // Keyboard shortcuts
     this.input.keyboard?.on('keydown-SPACE', () => {
-      this.scene.start('GameScene');
+      this.scene.start('GameScene', { useCustomDeck: this.stats.useCustomDeck });
     });
 
     this.input.keyboard?.on('keydown-ENTER', () => {
-      this.scene.start('GameScene');
+      this.scene.start('GameScene', { useCustomDeck: this.stats.useCustomDeck });
     });
 
     this.input.keyboard?.on('keydown-ESC', () => {
