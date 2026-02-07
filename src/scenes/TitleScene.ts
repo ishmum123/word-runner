@@ -3,7 +3,6 @@ import { parseAnkiCSV, saveCustomDeck, loadCustomDeck, clearCustomDeck, hasCusto
 
 export class TitleScene extends Phaser.Scene {
   private useCustomDeck: boolean = false;
-  private customDeckStatusText!: Phaser.GameObjects.Text;
   private fileInput!: HTMLInputElement;
 
   constructor() {
@@ -141,90 +140,69 @@ export class TitleScene extends Phaser.Scene {
 
   private createCustomDeckUI(): void {
     const { width, height } = this.cameras.main;
-    const deckY = height * 0.92;
+    const deckY = height * 0.94;
 
-    // Custom deck status text
-    this.customDeckStatusText = this.add.text(width / 2, deckY - 25, '', {
-      fontSize: '12px',
-      fontFamily: 'Arial',
-      color: '#aaaaaa',
-    }).setOrigin(0.5);
-    this.updateDeckStatusText();
+    const customDeck = loadCustomDeck();
+    const hasCustom = customDeck && customDeck.length > 0;
 
-    // Upload CSV button
-    const uploadButton = this.add.container(width / 2 - 70, deckY + 10);
-    const uploadBg = this.add.graphics();
-    uploadBg.fillStyle(0x0f3460, 1);
-    uploadBg.fillRoundedRect(-55, -18, 110, 36, 8);
-    const uploadText = this.add.text(0, 0, 'Upload CSV', {
+    // Single button showing current deck with option to change
+    const deckButton = this.add.container(width / 2, deckY);
+    const deckBg = this.add.graphics();
+
+    // Different colors based on deck type
+    const bgColor = hasCustom ? 0x0f3460 : 0x2a2a3e;
+    const hoverColor = hasCustom ? 0x1a4a7a : 0x3a3a4e;
+
+    deckBg.fillStyle(bgColor, 1);
+    deckBg.fillRoundedRect(-120, -22, 240, 44, 8);
+
+    // Button text shows current deck info
+    const buttonLabel = hasCustom
+      ? `Custom: ${customDeck.length} words`
+      : 'Deck: HSK 1-6';
+
+    const deckText = this.add.text(hasCustom ? -15 : 0, 0, buttonLabel, {
       fontSize: '14px',
       fontFamily: 'Arial',
-      color: '#ffffff',
+      color: hasCustom ? '#00cc66' : '#aaaaaa',
     }).setOrigin(0.5);
-    uploadButton.add([uploadBg, uploadText]);
-    uploadButton.setSize(110, 36);
-    uploadButton.setInteractive({ useHandCursor: true });
 
-    uploadButton.on('pointerover', () => {
-      uploadBg.clear();
-      uploadBg.fillStyle(0x1a4a7a, 1);
-      uploadBg.fillRoundedRect(-55, -18, 110, 36, 8);
+    deckButton.add([deckBg, deckText]);
+
+    // Add change indicator
+    const changeText = this.add.text(hasCustom ? 85 : 95, 0, '[change]', {
+      fontSize: '11px',
+      fontFamily: 'Arial',
+      color: '#666666',
+    }).setOrigin(0.5);
+    deckButton.add(changeText);
+
+    deckButton.setSize(240, 44);
+    deckButton.setInteractive({ useHandCursor: true });
+
+    deckButton.on('pointerover', () => {
+      deckBg.clear();
+      deckBg.fillStyle(hoverColor, 1);
+      deckBg.fillRoundedRect(-120, -22, 240, 44, 8);
     });
 
-    uploadButton.on('pointerout', () => {
-      uploadBg.clear();
-      uploadBg.fillStyle(0x0f3460, 1);
-      uploadBg.fillRoundedRect(-55, -18, 110, 36, 8);
+    deckButton.on('pointerout', () => {
+      deckBg.clear();
+      deckBg.fillStyle(bgColor, 1);
+      deckBg.fillRoundedRect(-120, -22, 240, 44, 8);
     });
 
-    uploadButton.on('pointerdown', () => {
-      this.fileInput.click();
-    });
-
-    // Clear deck button (only if custom deck exists)
-    if (hasCustomDeck()) {
-      const clearButton = this.add.container(width / 2 + 70, deckY + 10);
-      const clearBg = this.add.graphics();
-      clearBg.fillStyle(0x4a3030, 1);
-      clearBg.fillRoundedRect(-55, -18, 110, 36, 8);
-      const clearText = this.add.text(0, 0, 'Use HSK', {
-        fontSize: '14px',
-        fontFamily: 'Arial',
-        color: '#ffffff',
-      }).setOrigin(0.5);
-      clearButton.add([clearBg, clearText]);
-      clearButton.setSize(110, 36);
-      clearButton.setInteractive({ useHandCursor: true });
-
-      clearButton.on('pointerover', () => {
-        clearBg.clear();
-        clearBg.fillStyle(0x6a4040, 1);
-        clearBg.fillRoundedRect(-55, -18, 110, 36, 8);
-      });
-
-      clearButton.on('pointerout', () => {
-        clearBg.clear();
-        clearBg.fillStyle(0x4a3030, 1);
-        clearBg.fillRoundedRect(-55, -18, 110, 36, 8);
-      });
-
-      clearButton.on('pointerdown', () => {
+    deckButton.on('pointerdown', () => {
+      if (hasCustom) {
+        // If custom deck exists, clear it and use HSK
         clearCustomDeck();
         this.useCustomDeck = false;
         this.scene.restart();
-      });
-    }
-  }
-
-  private updateDeckStatusText(): void {
-    const customDeck = loadCustomDeck();
-    if (customDeck && customDeck.length > 0) {
-      this.customDeckStatusText.setText(`Custom Deck: ${customDeck.length} words`);
-      this.customDeckStatusText.setColor('#00cc66');
-    } else {
-      this.customDeckStatusText.setText('Using HSK 1-6 vocabulary');
-      this.customDeckStatusText.setColor('#888888');
-    }
+      } else {
+        // If using HSK, allow upload of custom deck
+        this.fileInput.click();
+      }
+    });
   }
 
   private createFileInput(): void {
