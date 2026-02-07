@@ -366,7 +366,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.gates3D.length === 0) {
       this.questionStartTime = this.time.now;
-      this.englishWordText.setText(question.correctWord.english);
+      this.updatePromptText(question);
     }
 
     const gate: Gate3D = {
@@ -440,6 +440,8 @@ export class GameScene extends Phaser.Scene {
     const lanes: Lane[] = ['left', 'center', 'right'];
     const laneWidth = gateWidth / 3;
 
+    const isChineseToEnglish = gate.question.mode === 'chinese-to-english';
+
     gate.question.options.forEach((option) => {
       const laneIndex = lanes.indexOf(option.lane);
       const x = (laneIndex - 1) * laneWidth;
@@ -456,21 +458,33 @@ export class GameScene extends Phaser.Scene {
 
       gate.container.add(tabletGfx);
 
-      // Chinese word - LARGE font
-      const wordText = this.add.text(x, -55, option.word.chinese, {
-        fontSize: '36px',
-        fontFamily: 'Arial',
-        color: '#ffffff',
-      }).setOrigin(0.5);
+      if (isChineseToEnglish) {
+        // English word as option
+        const wordText = this.add.text(x, -40, option.word.english, {
+          fontSize: '22px',
+          fontFamily: 'Georgia, serif',
+          color: '#ffffff',
+          wordWrap: { width: 120 },
+          align: 'center',
+        }).setOrigin(0.5);
+        gate.container.add(wordText);
+      } else {
+        // Chinese word - LARGE font
+        const wordText = this.add.text(x, -55, option.word.chinese, {
+          fontSize: '36px',
+          fontFamily: 'Arial',
+          color: '#ffffff',
+        }).setOrigin(0.5);
 
-      // Pinyin
-      const pinyinText = this.add.text(x, -20, option.word.pinyin, {
-        fontSize: '14px',
-        fontFamily: 'Arial',
-        color: '#c9a227',
-      }).setOrigin(0.5);
+        // Pinyin
+        const pinyinText = this.add.text(x, -20, option.word.pinyin, {
+          fontSize: '14px',
+          fontFamily: 'Arial',
+          color: '#c9a227',
+        }).setOrigin(0.5);
 
-      gate.container.add([wordText, pinyinText]);
+        gate.container.add([wordText, pinyinText]);
+      }
     });
   }
 
@@ -506,10 +520,10 @@ export class GameScene extends Phaser.Scene {
         gate.container.destroy(true); // true = destroy children too
         this.gates3D.splice(i, 1);
 
-        // Update English word to next gate
+        // Update prompt text to next gate
         if (this.gates3D.length > 0) {
           this.questionStartTime = this.time.now;
-          this.englishWordText.setText(this.gates3D[0].question.correctWord.english);
+          this.updatePromptText(this.gates3D[0].question);
         }
       }
     }
@@ -554,13 +568,27 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       soundManager.play('wrong');
-      this.showFeedback(false, gate.question.correctWord.chinese);
+      // Show correct answer in the appropriate language
+      const correctAnswer = gate.question.mode === 'chinese-to-english'
+        ? gate.question.correctWord.english
+        : gate.question.correctWord.chinese;
+      this.showFeedback(false, correctAnswer);
       this.lives--;
       this.updateLivesDisplay();
       soundManager.play('lifeLost');
       this.cameras.main.shake(250, 0.02);
 
       if (this.lives <= 0) this.gameOver();
+    }
+  }
+
+  private updatePromptText(question: WordQuestion): void {
+    if (question.mode === 'chinese-to-english') {
+      // Show Chinese word with pinyin on top
+      this.englishWordText.setText(`${question.correctWord.chinese}\n${question.correctWord.pinyin}`);
+    } else {
+      // Show English word on top
+      this.englishWordText.setText(question.correctWord.english);
     }
   }
 

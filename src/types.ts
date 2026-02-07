@@ -31,3 +31,5 @@ export interface GameStats {
 }
 
 export type Lane = 'left' | 'center' | 'right';
+
+export type QuestionMode = 'english-to-chinese' | 'chinese-to-english';

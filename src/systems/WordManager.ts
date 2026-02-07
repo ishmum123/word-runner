@@ -1,10 +1,11 @@
-import type { Word, Lane } from '../types';
+import type { Word, Lane, QuestionMode } from '../types';
 import { getWordsForLevel } from '../data';
 
 export interface WordQuestion {
   correctWord: Word;
   options: { lane: Lane; word: Word }[];
   correctLane: Lane;
+  mode: QuestionMode;
 }
 
 export class WordManager {
@@ -44,7 +45,10 @@ export class WordManager {
       }
     }
 
-    return { correctWord, options, correctLane };
+    // Randomly choose question mode
+    const mode: QuestionMode = Math.random() < 0.5 ? 'english-to-chinese' : 'chinese-to-english';
+
+    return { correctWord, options, correctLane, mode };
   }
 
   private getAvailableWords(hskLevel: number): Word[] {
