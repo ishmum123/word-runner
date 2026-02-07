@@ -329,18 +329,26 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.cameras.main;
 
     this.pauseButton = this.add.container(width / 2, 32);
-    const pauseBg = this.add.graphics();
-    pauseBg.fillStyle(0x2a2030, 0.8);
-    pauseBg.fillRoundedRect(-20, -15, 40, 30, 6);
 
-    // Pause icon (two vertical bars)
+    // Larger tap area for mobile (invisible)
+    const tapArea = this.add.graphics();
+    tapArea.fillStyle(0x000000, 0);
+    tapArea.fillRect(-30, -25, 60, 50);
+
+    const pauseBg = this.add.graphics();
+    pauseBg.fillStyle(0x2a2030, 0.9);
+    pauseBg.fillRoundedRect(-25, -18, 50, 36, 8);
+    pauseBg.lineStyle(2, 0xc9a227, 0.6);
+    pauseBg.strokeRoundedRect(-25, -18, 50, 36, 8);
+
+    // Pause icon (two vertical bars) - slightly larger
     const pauseIcon = this.add.graphics();
     pauseIcon.fillStyle(0xc9a227, 1);
-    pauseIcon.fillRect(-8, -8, 5, 16);
-    pauseIcon.fillRect(3, -8, 5, 16);
+    pauseIcon.fillRect(-10, -10, 7, 20);
+    pauseIcon.fillRect(3, -10, 7, 20);
 
-    this.pauseButton.add([pauseBg, pauseIcon]);
-    this.pauseButton.setSize(40, 30);
+    this.pauseButton.add([tapArea, pauseBg, pauseIcon]);
+    this.pauseButton.setSize(60, 50);
     this.pauseButton.setInteractive({ useHandCursor: true });
     this.pauseButton.setDepth(1000);
 
@@ -362,16 +370,16 @@ export class GameScene extends Phaser.Scene {
     overlay.fillRect(0, 0, width, height);
     this.pauseOverlay.add(overlay);
 
-    // Pause menu panel
+    // Pause menu panel - larger for mobile-friendly buttons
     const panel = this.add.graphics();
     panel.fillStyle(0x1a1a2e, 0.95);
-    panel.fillRoundedRect(width / 2 - 120, height / 2 - 120, 240, 240, 16);
+    panel.fillRoundedRect(width / 2 - 130, height / 2 - 130, 260, 280, 16);
     panel.lineStyle(3, 0xc9a227, 1);
-    panel.strokeRoundedRect(width / 2 - 120, height / 2 - 120, 240, 240, 16);
+    panel.strokeRoundedRect(width / 2 - 130, height / 2 - 130, 260, 280, 16);
     this.pauseOverlay.add(panel);
 
     // Paused title
-    const title = this.add.text(width / 2, height / 2 - 80, 'PAUSED', {
+    const title = this.add.text(width / 2, height / 2 - 90, 'PAUSED', {
       fontSize: '36px',
       fontFamily: 'Arial Black',
       color: '#c9a227',
@@ -379,7 +387,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseOverlay.add(title);
 
     // Resume button
-    const resumeButton = this.createPauseMenuButton(width / 2, height / 2, 'RESUME', 0x2a6a30, () => {
+    const resumeButton = this.createPauseMenuButton(width / 2, height / 2 - 10, 'RESUME', 0x2a6a30, () => {
       this.togglePause();
     });
     this.pauseOverlay.add(resumeButton);
@@ -392,7 +400,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseOverlay.add(quitButton);
 
     // Instructions
-    const hint = this.add.text(width / 2, height / 2 + 130, 'Press ESC or P to resume', {
+    const hint = this.add.text(width / 2, height / 2 + 135, 'Tap to resume or quit', {
       fontSize: '12px',
       fontFamily: 'Arial',
       color: '#666666',
@@ -403,18 +411,19 @@ export class GameScene extends Phaser.Scene {
   private createPauseMenuButton(x: number, y: number, text: string, color: number, callback: () => void): Phaser.GameObjects.Container {
     const button = this.add.container(x, y);
 
+    // Larger buttons for mobile-friendly touch targets
     const bg = this.add.graphics();
     bg.fillStyle(color, 1);
-    bg.fillRoundedRect(-80, -22, 160, 44, 10);
+    bg.fillRoundedRect(-90, -28, 180, 56, 12);
 
     const label = this.add.text(0, 0, text, {
-      fontSize: '20px',
+      fontSize: '24px',
       fontFamily: 'Arial Black',
       color: '#ffffff',
     }).setOrigin(0.5);
 
     button.add([bg, label]);
-    button.setSize(160, 44);
+    button.setSize(180, 56);
     button.setInteractive({ useHandCursor: true });
 
     const hoverColor = Phaser.Display.Color.ValueToColor(color).lighten(20).color;
@@ -422,13 +431,13 @@ export class GameScene extends Phaser.Scene {
     button.on('pointerover', () => {
       bg.clear();
       bg.fillStyle(hoverColor, 1);
-      bg.fillRoundedRect(-80, -22, 160, 44, 10);
+      bg.fillRoundedRect(-90, -28, 180, 56, 12);
     });
 
     button.on('pointerout', () => {
       bg.clear();
       bg.fillStyle(color, 1);
-      bg.fillRoundedRect(-80, -22, 160, 44, 10);
+      bg.fillRoundedRect(-90, -28, 180, 56, 12);
     });
 
     button.on('pointerdown', callback);
