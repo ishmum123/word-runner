@@ -818,9 +818,10 @@ export class Game3D {
       }
     } else {
       soundManager.play('wrong');
+      const word = gate.question.correctWord;
       const correctAnswer = gate.question.mode === 'chinese-to-english'
-        ? gate.question.correctWord.english
-        : `${gate.question.correctWord.chinese}\n${gate.question.correctWord.pinyin}`;
+        ? `${word.chinese} (${word.pinyin}) = ${word.english}`
+        : `${word.english} = ${word.chinese} (${word.pinyin})`;
       this.showFeedback(false, correctAnswer);
       this.lives--;
       this.updateLivesDisplay();
