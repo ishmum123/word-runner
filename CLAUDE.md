@@ -48,8 +48,8 @@ interface Gate3D {
 - `GATE_SPACING_TIME` - Time between gate spawns (ms)
 
 **Gate lifecycle:**
-1. Spawn at `GATE_START_Y` (near English word prompt)
-2. Move down screen based on `progress` (time-based)
+1. Spawn at `GATE_START_Z` (far end of track)
+2. Move toward player based on `progress` (time-based)
 3. Collision check at `progress >= 0.98`
 4. Destroyed at `progress >= 1.15`
 
