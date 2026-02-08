@@ -936,9 +936,17 @@ export class Game3D {
       const elapsed = now - gate.spawnTime;
       gate.progress = elapsed / (this.GATE_TRAVEL_TIME / this.gameSpeed);
 
-      // Move gate towards player - round to reduce floating point jitter
+      // Move gate towards player
       const targetZ = this.GATE_START_Z + (this.PLAYER_Z - this.GATE_START_Z) * gate.progress;
       gate.group.position.z = Math.round(targetZ * 100) / 100;
+
+      // Partial counter-scale: 50% compensation for perspective growth
+      const cameraZ = 8;
+      const initialDistance = cameraZ - this.GATE_START_Z;
+      const currentDistance = Math.max(cameraZ - gate.group.position.z, 1);
+      const fullCompensation = currentDistance / initialDistance;
+      const scale = 1 * 0.5 + fullCompensation * 0.5;
+      gate.group.scale.setScalar(scale);
 
       // Check collision
       if (gate.progress >= 0.98 && !gate.processed) {
