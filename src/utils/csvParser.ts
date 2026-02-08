@@ -28,32 +28,35 @@ export function parseAnkiCSV(csvContent: string): CSVParseResult {
     firstLine.includes('hanzi') ||
     firstLine.includes('meaning') ||
     firstLine.includes('front') ||
-    firstLine.includes('back')
+    firstLine.includes('back') ||
+    firstLine.includes('target') ||
+    firstLine.includes('pronunciation') ||
+    firstLine.includes('arabic')
   ) {
     hasHeader = true;
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
 
     headers.forEach((header, index) => {
       // Map various common column names
-      if (header.includes('chinese') || header.includes('hanzi') || header.includes('character')) {
-        columnMap['chinese'] = index;
-      } else if (header.includes('pinyin') || header.includes('pronunciation') || header.includes('reading')) {
-        columnMap['pinyin'] = index;
+      if (header.includes('target') || header.includes('chinese') || header.includes('hanzi') || header.includes('character') || header.includes('arabic')) {
+        columnMap['target'] = index;
+      } else if (header.includes('pronunciation') || header.includes('pinyin') || header.includes('reading')) {
+        columnMap['pronunciation'] = index;
       } else if (header.includes('english') || header.includes('meaning') || header.includes('definition') || header.includes('translation')) {
         columnMap['english'] = index;
       } else if (header.includes('category') || header.includes('tag') || header.includes('type') || header.includes('deck')) {
         columnMap['category'] = index;
       } else if (header === 'front') {
-        columnMap['chinese'] = index;
+        columnMap['target'] = index;
       } else if (header === 'back') {
         columnMap['english'] = index;
       }
     });
   }
 
-  // If no header or incomplete mapping, assume column order: chinese, pinyin, english, [category]
+  // If no header or incomplete mapping, assume column order: target, pronunciation, english, [category]
   if (!hasHeader || Object.keys(columnMap).length < 2) {
-    columnMap = { chinese: 0, pinyin: 1, english: 2, category: 3 };
+    columnMap = { target: 0, pronunciation: 1, english: 2, category: 3 };
   }
 
   // Process data rows
@@ -65,18 +68,18 @@ export function parseAnkiCSV(csvContent: string): CSVParseResult {
 
     const columns = parseCSVLine(line);
 
-    const chinese = columns[columnMap['chinese']]?.trim() || '';
-    const pinyin = columns[columnMap['pinyin']]?.trim() || '';
+    const target = columns[columnMap['target']]?.trim() || '';
+    const pronunciation = columns[columnMap['pronunciation']]?.trim() || '';
     const english = columns[columnMap['english']]?.trim() || '';
     const category = columns[columnMap['category']]?.trim() || 'custom';
 
-    if (!chinese && !english) {
-      errors.push(`Line ${i + 1}: Missing both Chinese and English`);
+    if (!target && !english) {
+      errors.push(`Line ${i + 1}: Missing both target and English`);
       continue;
     }
 
-    if (!chinese) {
-      errors.push(`Line ${i + 1}: Missing Chinese characters`);
+    if (!target) {
+      errors.push(`Line ${i + 1}: Missing target characters`);
       continue;
     }
 
@@ -86,8 +89,8 @@ export function parseAnkiCSV(csvContent: string): CSVParseResult {
     }
 
     words.push({
-      chinese,
-      pinyin: pinyin || '',
+      target,
+      pronunciation: pronunciation || '',
       english,
       category,
     });

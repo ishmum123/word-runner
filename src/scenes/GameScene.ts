@@ -614,7 +614,7 @@ export class GameScene extends Phaser.Scene {
     const lanes: Lane[] = ['left', 'center', 'right'];
     const laneWidth = gateWidth / 3;
 
-    const isChineseToEnglish = gate.question.mode === 'chinese-to-english';
+    const isChineseToEnglish = gate.question.mode === 'target-to-english';
 
     gate.question.options.forEach((option) => {
       const laneIndex = lanes.indexOf(option.lane);
@@ -644,14 +644,14 @@ export class GameScene extends Phaser.Scene {
         gate.container.add(wordText);
       } else {
         // Chinese word - LARGE font
-        const wordText = this.add.text(x, -55, option.word.chinese, {
+        const wordText = this.add.text(x, -55, option.word.target, {
           fontSize: '36px',
           fontFamily: 'Arial',
           color: '#ffffff',
         }).setOrigin(0.5);
 
         // Pinyin
-        const pinyinText = this.add.text(x, -20, option.word.pinyin, {
+        const pinyinText = this.add.text(x, -20, option.word.pronunciation, {
           fontSize: '14px',
           fontFamily: 'Arial',
           color: '#c9a227',
@@ -746,9 +746,9 @@ export class GameScene extends Phaser.Scene {
     } else {
       soundManager.play('wrong');
       // Show correct answer in the appropriate language (with pinyin for Chinese)
-      const correctAnswer = gate.question.mode === 'chinese-to-english'
+      const correctAnswer = gate.question.mode === 'target-to-english'
         ? gate.question.correctWord.english
-        : `${gate.question.correctWord.chinese}\n${gate.question.correctWord.pinyin}`;
+        : `${gate.question.correctWord.target}\n${gate.question.correctWord.pronunciation}`;
       this.showFeedback(false, correctAnswer);
       this.lives--;
       this.updateLivesDisplay();
@@ -760,9 +760,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePromptText(question: WordQuestion): void {
-    if (question.mode === 'chinese-to-english') {
+    if (question.mode === 'target-to-english') {
       // Show Chinese word with pinyin on top
-      this.englishWordText.setText(`${question.correctWord.chinese}\n${question.correctWord.pinyin}`);
+      this.englishWordText.setText(`${question.correctWord.target}\n${question.correctWord.pronunciation}`);
     } else {
       // Show English word on top
       this.englishWordText.setText(question.correctWord.english);
@@ -851,7 +851,7 @@ export class GameScene extends Phaser.Scene {
       correctAnswers: this.scoreSystem.getCorrectAnswers(),
       totalAnswers: this.scoreSystem.getTotalAnswers(),
       maxStreak: this.scoreSystem.getMaxStreak(),
-      highestHSK: this.difficultySystem.getCurrentSettings().hskLevel,
+      highestLevel: this.difficultySystem.getCurrentSettings().hskLevel,
       useCustomDeck: this.wordManager.hasCustomWords(),
     };
 

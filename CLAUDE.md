@@ -4,7 +4,7 @@ This file provides context for AI agents working on this codebase.
 
 ## Project Overview
 
-Word Runner is a 3D game built with Three.js, TypeScript, and Vite. It's an endless runner where players learn Chinese vocabulary by selecting correct translations. The game features bidirectional question modes (Chinese↔English) and supports custom vocabulary via Anki CSV import.
+Word Runner is a 3D game built with Three.js, TypeScript, and Vite. It's an endless runner where players learn vocabulary by selecting correct translations. The game supports multiple languages (Chinese and Arabic), features bidirectional question modes (target↔English), and supports custom vocabulary via Anki CSV import. A language selector on the title screen lets the user pick their target language.
 
 ## Build & Run Commands
 
@@ -24,7 +24,7 @@ npm run build    # Production build (outputs to dist/)
 
 The game uses Three.js for 3D rendering with HTML overlay for UI:
 
-1. **Title Screen** (`src/game3d/index.ts`) → Start screen with CSV upload option
+1. **Title Screen** (`src/game3d/index.ts`) → Start screen with language selector and CSV upload option
 2. **Game3D** (`src/game3d/Game3D.ts`) → Main 3D gameplay loop
 3. **Game Over** → Shows stats overlay, retry or menu options
 
@@ -55,16 +55,18 @@ interface Gate3D {
 
 ### Difficulty System (DifficultySystem.ts)
 
-HSK level increases every 50 correct answers (not distance-based):
-- HSK 1: 0-49 correct
-- HSK 2: 50-99 correct
-- ...up to HSK 6
+Level increases every 50 correct answers (not distance-based):
+- Level 1: 0-49 correct
+- Level 2: 50-99 correct
+- ...up to Level 6
+
+For Chinese, levels are displayed as "HSK 1-6"; for other languages, "Level 1-6".
 
 Speed multiplier increases slightly with each level.
 
 ### Word Selection (WordManager.ts)
 
-- Pulls words from current HSK level + one level below
+- Accepts a `language` parameter and pulls words from current level + one level below
 - Avoids repeating words within last 20 questions
 - Prefers same-category distractors for harder choices
 
@@ -80,12 +82,14 @@ Speed multiplier increases slightly with each level.
 | File | Purpose |
 |------|---------|
 | `src/game3d/Game3D.ts` | Main 3D gameplay - gates, player, collision |
-| `src/game3d/index.ts` | Title screen and game initialization |
-| `src/systems/DifficultySystem.ts` | HSK progression logic |
-| `src/systems/WordManager.ts` | Word selection and distractors |
+| `src/game3d/index.ts` | Title screen, language selector, game initialization |
+| `src/systems/DifficultySystem.ts` | Level progression logic |
+| `src/systems/WordManager.ts` | Language-aware word selection and distractors |
 | `src/systems/ScoreSystem.ts` | Points, streaks, accuracy |
 | `src/utils/csvParser.ts` | Anki CSV import for custom vocabulary |
-| `src/data/hsk1-6.ts` | Vocabulary databases (~100 words each) |
+| `src/data/hsk1-6.ts` | Chinese vocabulary databases (~100 words each) |
+| `src/data/arabic/` | Arabic vocabulary databases (level1-6.ts, ~100 words each) |
+| `src/data/index.ts` | Language-aware word retrieval (`getWordsForLevel(level, language)`) |
 | `src/audio/SoundManager.ts` | Synthesized sound effects |
 
 ## Common Modifications
@@ -97,10 +101,20 @@ Edit `GATE_TRAVEL_TIME` and `GATE_SPACING_TIME` in Game3D.ts.
 Edit `CORRECT_ANSWERS_PER_LEVEL` in DifficultySystem.ts (default: 50).
 
 ### Add New Words
-Add to the appropriate `src/data/hskN.ts` file:
+Add to the appropriate data file using `target`/`pronunciation` fields:
 ```typescript
-{ chinese: '词', pinyin: 'cí', english: 'word', category: 'education' }
+// Chinese: src/data/hskN.ts
+{ target: '词', pronunciation: 'cí', english: 'word', category: 'education' }
+
+// Arabic: src/data/arabic/levelN.ts
+{ target: 'كلمة', pronunciation: 'kalima', english: 'word', category: 'education' }
 ```
+
+### Add a New Language
+1. Create `src/data/<language>/level1-6.ts` and `index.ts`
+2. Add the language to the `Language` type in `src/types.ts`
+3. Add routing in `src/data/index.ts` (`getWordsForLevel`)
+4. Add a selector button in `src/game3d/index.ts`
 
 ### Modify Gate Appearance
 The `createGate()` method in Game3D.ts handles all gate visuals including panels, text, and frame.
@@ -134,6 +148,10 @@ Text is rendered to HTML canvas elements, then used as Three.js textures on plan
 4. **Memory leaks** - Always dispose Three.js geometries and materials when removing objects
 
 5. **Perspective scaling** - Gates appear larger as they approach due to perspective camera - this is expected 3D behavior
+
+6. **RTL text** - Arabic text uses `ctx.direction = 'rtl'` on canvas; pronunciation (romanized) always uses LTR
+
+7. **Word type** - Uses `target`/`pronunciation` (not `chinese`/`pinyin`) for language-agnostic word representation
 
 ## Testing Locally
 

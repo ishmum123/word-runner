@@ -1,11 +1,13 @@
+export type Language = 'chinese' | 'arabic';
+
 export interface Word {
-  chinese: string;
-  pinyin: string;
+  target: string;
+  pronunciation: string;
   english: string;
   category: string;
 }
 
-export interface HSKLevel {
+export interface WordLevel {
   level: number;
   words: Word[];
 }
@@ -14,7 +16,7 @@ export interface GameState {
   score: number;
   lives: number;
   distance: number;
-  currentHSK: number;
+  currentLevel: number;
   streak: number;
   correctAnswers: number;
   totalAnswers: number;
@@ -27,10 +29,10 @@ export interface GameStats {
   correctAnswers: number;
   totalAnswers: number;
   maxStreak: number;
-  highestHSK: number;
+  highestLevel: number;
   useCustomDeck?: boolean;
 }
 
 export type Lane = 'left' | 'center' | 'right';
 
-export type QuestionMode = 'english-to-chinese' | 'chinese-to-english';
+export type QuestionMode = 'english-to-target' | 'target-to-english';

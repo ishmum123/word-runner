@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import type { Lane, GameStats } from '../types';
+import type { Lane, GameStats, Language } from '../types';
 import { WordManager, type WordQuestion } from '../systems/WordManager';
 import { ScoreSystem } from '../systems/ScoreSystem';
 import { DifficultySystem } from '../systems/DifficultySystem';
@@ -49,6 +49,7 @@ export class Game3D {
   private isPaused: boolean = false;
   private isGameOver: boolean = false;
   private useCustomDeck: boolean = false;
+  private language: Language;
 
   // Track
   private track!: THREE.Mesh;
@@ -69,12 +70,13 @@ export class Game3D {
   private readonly GATE_START_Z = -15; // Closer spawn for better visibility
   private readonly PLAYER_Z = 3;
 
-  constructor(container: HTMLElement, useCustomDeck: boolean = false) {
+  constructor(container: HTMLElement, useCustomDeck: boolean = false, language: Language = 'chinese') {
     this.container = container;
     this.useCustomDeck = useCustomDeck;
+    this.language = language;
     this.clock = new THREE.Clock();
 
-    this.wordManager = new WordManager();
+    this.wordManager = new WordManager(language);
     this.scoreSystem = new ScoreSystem();
     this.difficultySystem = new DifficultySystem();
 
@@ -436,7 +438,7 @@ export class Game3D {
     `;
     this.uiContainer.appendChild(this.questionElement);
 
-    // HSK level (bottom)
+    // Level indicator (bottom)
     this.hskElement = document.createElement('div');
     this.hskElement.style.cssText = `
       position: absolute;
@@ -561,6 +563,10 @@ export class Game3D {
     }
   }
 
+  private isRTL(): boolean {
+    return this.language === 'arabic';
+  }
+
   private spawnGate(): void {
     const settings = this.difficultySystem.getCurrentSettings();
     const question = this.wordManager.generateQuestion(settings.hskLevel);
@@ -610,7 +616,7 @@ export class Game3D {
     // Word panels - very large for readability
     const textMeshes: THREE.Mesh[] = [];
     const lanes: Lane[] = ['left', 'center', 'right'];
-    const isChineseToEnglish = question.mode === 'chinese-to-english';
+    const isTargetToEnglish = question.mode === 'target-to-english';
 
     question.options.forEach((option) => {
       const laneIndex = lanes.indexOf(option.lane);
@@ -639,7 +645,7 @@ export class Game3D {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      if (isChineseToEnglish) {
+      if (isTargetToEnglish) {
         // English word - wrap text if needed
         const word = option.word.english;
         ctx.shadowColor = '#ffffff';
@@ -690,19 +696,29 @@ export class Game3D {
           ctx.fillText(line, 256, startY + i * lineHeight);
         });
       } else {
-        // Chinese character - centered
+        // Target language character - centered
         ctx.shadowColor = '#ffffff';
         ctx.shadowBlur = 15;
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 100px Arial';
-        ctx.fillText(option.word.chinese, 256, 150);
 
-        // Pinyin below
+        // Use larger font for Arabic since characters are typically smaller
+        const targetFontSize = this.isRTL() ? 80 : 100;
+        ctx.font = `bold ${targetFontSize}px Arial`;
+
+        // Handle RTL for Arabic
+        if (this.isRTL()) {
+          ctx.direction = 'rtl';
+        }
+
+        ctx.fillText(option.word.target, 256, 150);
+
+        // Pronunciation below
         ctx.shadowColor = '#c9a227';
         ctx.shadowBlur = 8;
         ctx.fillStyle = '#c9a227';
         ctx.font = 'bold 40px Arial';
-        ctx.fillText(option.word.pinyin, 256, 260);
+        ctx.direction = 'ltr'; // Pronunciation is always LTR (romanized)
+        ctx.fillText(option.word.pronunciation, 256, 260);
       }
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -730,8 +746,9 @@ export class Game3D {
   }
 
   private updateQuestionDisplay(question: WordQuestion): void {
-    if (question.mode === 'chinese-to-english') {
-      this.questionElement.innerHTML = `${question.correctWord.chinese}<br><span style="font-size: 18px; color: #c9a227;">${question.correctWord.pinyin}</span>`;
+    if (question.mode === 'target-to-english') {
+      const dir = this.isRTL() ? ' dir="rtl"' : '';
+      this.questionElement.innerHTML = `<span${dir}>${question.correctWord.target}</span><br><span style="font-size: 18px; color: #c9a227;">${question.correctWord.pronunciation}</span>`;
     } else {
       this.questionElement.textContent = question.correctWord.english;
     }
@@ -788,13 +805,21 @@ export class Game3D {
       padding: 30px 50px;
       text-align: center;
     `;
+    const levelLabel = this.getLevelLabel(level);
     levelUp.innerHTML = `
-      <div style="color: #c9a227; font-size: 48px; font-weight: bold;">HSK ${level}</div>
+      <div style="color: #c9a227; font-size: 48px; font-weight: bold;">${levelLabel}</div>
       <div style="color: white; font-size: 24px;">LEVEL UP!</div>
     `;
     this.uiContainer.appendChild(levelUp);
 
     setTimeout(() => levelUp.remove(), 2000);
+  }
+
+  private getLevelLabel(level: number): string {
+    if (this.language === 'chinese') {
+      return `HSK ${level}`;
+    }
+    return `Level ${level}`;
   }
 
   private processGateCollision(gate: Gate3D): void {
@@ -819,9 +844,9 @@ export class Game3D {
     } else {
       soundManager.play('wrong');
       const word = gate.question.correctWord;
-      const correctAnswer = gate.question.mode === 'chinese-to-english'
-        ? `${word.chinese} (${word.pinyin}) = ${word.english}`
-        : `${word.english} = ${word.chinese} (${word.pinyin})`;
+      const correctAnswer = gate.question.mode === 'target-to-english'
+        ? `${word.target} (${word.pronunciation}) = ${word.english}`
+        : `${word.english} = ${word.target} (${word.pronunciation})`;
       this.showFeedback(false, correctAnswer);
       this.lives--;
       this.updateLivesDisplay();
@@ -843,7 +868,7 @@ export class Game3D {
       correctAnswers: this.scoreSystem.getCorrectAnswers(),
       totalAnswers: this.scoreSystem.getTotalAnswers(),
       maxStreak: this.scoreSystem.getMaxStreak(),
-      highestHSK: this.difficultySystem.getCurrentSettings().hskLevel,
+      highestLevel: this.difficultySystem.getCurrentSettings().hskLevel,
       useCustomDeck: this.wordManager.hasCustomWords(),
     };
 
@@ -984,7 +1009,11 @@ export class Game3D {
 
     // Update UI
     this.scoreElement.textContent = this.scoreSystem.getScore().toString();
-    this.hskElement.textContent = this.wordManager.hasCustomWords() ? 'Custom' : `HSK ${settings.hskLevel}`;
+    if (this.wordManager.hasCustomWords()) {
+      this.hskElement.textContent = 'Custom';
+    } else {
+      this.hskElement.textContent = this.getLevelLabel(settings.hskLevel);
+    }
 
     this.renderer.render(this.scene, this.camera);
   }

@@ -1,12 +1,13 @@
-import type { Word } from '../types';
+import type { Word, Language } from '../types';
 import { hsk1Words } from './hsk1';
 import { hsk2Words } from './hsk2';
 import { hsk3Words } from './hsk3';
 import { hsk4Words } from './hsk4';
 import { hsk5Words } from './hsk5';
 import { hsk6Words } from './hsk6';
+import { getArabicWordsForLevel } from './arabic';
 
-export const hskWordsByLevel: Record<number, Word[]> = {
+const chineseWordsByLevel: Record<number, Word[]> = {
   1: hsk1Words,
   2: hsk2Words,
   3: hsk3Words,
@@ -15,10 +16,16 @@ export const hskWordsByLevel: Record<number, Word[]> = {
   6: hsk6Words,
 };
 
-export function getWordsForLevel(level: number): Word[] {
-  return hskWordsByLevel[level] || [];
+export function getWordsForLevel(level: number, language: Language = 'chinese'): Word[] {
+  if (language === 'arabic') {
+    return getArabicWordsForLevel(level);
+  }
+  return chineseWordsByLevel[level] || [];
 }
 
-export function getAllWords(): Word[] {
-  return Object.values(hskWordsByLevel).flat();
+export function getAllWords(language: Language = 'chinese'): Word[] {
+  if (language === 'arabic') {
+    return [1, 2, 3, 4, 5, 6].flatMap(level => getArabicWordsForLevel(level));
+  }
+  return Object.values(chineseWordsByLevel).flat();
 }

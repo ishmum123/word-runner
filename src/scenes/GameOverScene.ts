@@ -79,8 +79,8 @@ export class GameOverScene extends Phaser.Scene {
       this.add.text(60, statsStartY + lineHeight * 5, 'Deck', statsConfig);
       this.add.text(width - 60, statsStartY + lineHeight * 5, 'Custom', valueConfig).setOrigin(1, 0);
     } else {
-      this.add.text(60, statsStartY + lineHeight * 5, 'Highest HSK', statsConfig);
-      this.add.text(width - 60, statsStartY + lineHeight * 5, `HSK ${this.stats.highestHSK}`, valueConfig).setOrigin(1, 0);
+      this.add.text(60, statsStartY + lineHeight * 5, 'Highest Level', statsConfig);
+      this.add.text(width - 60, statsStartY + lineHeight * 5, `Level ${this.stats.highestLevel}`, valueConfig).setOrigin(1, 0);
     }
 
     // Performance message

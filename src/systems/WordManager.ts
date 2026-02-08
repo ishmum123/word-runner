@@ -1,4 +1,4 @@
-import type { Word, Lane, QuestionMode } from '../types';
+import type { Word, Lane, QuestionMode, Language } from '../types';
 import { getWordsForLevel } from '../data';
 
 export interface WordQuestion {
@@ -12,6 +12,11 @@ export class WordManager {
   private recentWords: string[] = [];
   private readonly maxRecentWords = 20;
   private customWords: Word[] | null = null;
+  private language: Language;
+
+  constructor(language: Language = 'chinese') {
+    this.language = language;
+  }
 
   setCustomWords(words: Word[]): void {
     this.customWords = words;
@@ -27,12 +32,12 @@ export class WordManager {
       : this.getAvailableWords(hskLevel);
 
     // Select correct word (not recently used)
-    const availableWords = words.filter(w => !this.recentWords.includes(w.chinese));
+    const availableWords = words.filter(w => !this.recentWords.includes(w.target));
     const correctWord = availableWords[Math.floor(Math.random() * availableWords.length)]
       || words[Math.floor(Math.random() * words.length)];
 
     // Track recent word
-    this.recentWords.push(correctWord.chinese);
+    this.recentWords.push(correctWord.target);
     if (this.recentWords.length > this.maxRecentWords) {
       this.recentWords.shift();
     }
@@ -57,32 +62,32 @@ export class WordManager {
     }
 
     // Randomly choose question mode
-    const mode: QuestionMode = Math.random() < 0.5 ? 'english-to-chinese' : 'chinese-to-english';
+    const mode: QuestionMode = Math.random() < 0.5 ? 'english-to-target' : 'target-to-english';
 
     return { correctWord, options, correctLane, mode };
   }
 
   private getAvailableWords(hskLevel: number): Word[] {
     // Get words from current level and one below (if available)
-    const currentWords = getWordsForLevel(hskLevel);
-    const prevWords = hskLevel > 1 ? getWordsForLevel(hskLevel - 1) : [];
+    const currentWords = getWordsForLevel(hskLevel, this.language);
+    const prevWords = hskLevel > 1 ? getWordsForLevel(hskLevel - 1, this.language) : [];
     return [...currentWords, ...prevWords];
   }
 
   private getDistractors(correctWord: Word, _hskLevel: number, pool: Word[]): Word[] {
     const distractors: Word[] = [];
     const sameCategoryWords = pool.filter(
-      w => w.category === correctWord.category && w.chinese !== correctWord.chinese
+      w => w.category === correctWord.category && w.target !== correctWord.target
     );
 
     // Prefer same category distractors
     const shuffledCategory = this.shuffle([...sameCategoryWords]);
-    const shuffledPool = this.shuffle(pool.filter(w => w.chinese !== correctWord.chinese));
+    const shuffledPool = this.shuffle(pool.filter(w => w.target !== correctWord.target));
 
     // First try to get same category words
     for (const word of shuffledCategory) {
       if (distractors.length >= 2) break;
-      if (!distractors.some(d => d.chinese === word.chinese)) {
+      if (!distractors.some(d => d.target === word.target)) {
         distractors.push(word);
       }
     }
@@ -90,7 +95,7 @@ export class WordManager {
     // Fill remaining with random words
     for (const word of shuffledPool) {
       if (distractors.length >= 2) break;
-      if (!distractors.some(d => d.chinese === word.chinese)) {
+      if (!distractors.some(d => d.target === word.target)) {
         distractors.push(word);
       }
     }
