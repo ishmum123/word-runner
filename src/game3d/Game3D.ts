@@ -66,7 +66,7 @@ export class Game3D {
   private readonly LANE_WIDTH = 2;
   private readonly GATE_TRAVEL_TIME = 4000;
   private readonly GATE_SPACING_TIME = 4500;
-  private readonly GATE_START_Z = -20; // Closer spawn for better visibility
+  private readonly GATE_START_Z = -15; // Closer spawn for better visibility
   private readonly PLAYER_Z = 3;
 
   constructor(container: HTMLElement, useCustomDeck: boolean = false) {
