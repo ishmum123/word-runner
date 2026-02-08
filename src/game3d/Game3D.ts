@@ -67,7 +67,7 @@ export class Game3D {
   private readonly GATE_TRAVEL_TIME = 4000;
   private readonly GATE_SPACING_TIME = 4500;
   private readonly GATE_START_Z = -20; // Closer spawn for better visibility
-  private readonly PLAYER_Z = 0;
+  private readonly PLAYER_Z = 3;
 
   constructor(container: HTMLElement, useCustomDeck: boolean = false) {
     this.container = container;
@@ -115,8 +115,8 @@ export class Game3D {
       0.1,
       200
     );
-    this.camera.position.set(0, 5, 8);
-    this.camera.lookAt(0, 1, -10);
+    this.camera.position.set(0, 5, 10);
+    this.camera.lookAt(0, 2, -10);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
@@ -941,12 +941,12 @@ export class Game3D {
       const targetZ = this.GATE_START_Z + (this.PLAYER_Z - this.GATE_START_Z) * gate.progress;
       gate.group.position.z = Math.round(targetZ * 100) / 100;
 
-      // Partial counter-scale: 50% compensation for perspective growth
-      const cameraZ = 8;
+      // Partial counter-scale: 80% compensation for perspective growth
+      const cameraZ = 10;
       const initialDistance = cameraZ - this.GATE_START_Z;
       const currentDistance = Math.max(cameraZ - gate.group.position.z, 1);
       const fullCompensation = currentDistance / initialDistance;
-      const scale = 1 * 0.5 + fullCompensation * 0.5;
+      const scale = 1 * 0.2 + fullCompensation * 0.8;
       gate.group.scale.setScalar(scale);
 
       // Check collision
