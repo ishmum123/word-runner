@@ -1,4 +1,4 @@
-export type Language = 'chinese' | 'arabic';
+export type Language = 'chinese' | 'arabic' | 'japanese';
 
 export interface Word {
   target: string;

@@ -827,6 +827,10 @@ export class Game3D {
     if (this.language === 'chinese') {
       return `HSK ${level}`;
     }
+    if (this.language === 'japanese') {
+      const jlptMap: Record<number, string> = { 1: 'N5', 2: 'N4', 3: 'N3', 4: 'N2', 5: 'N1', 6: 'N1+' };
+      return `JLPT ${jlptMap[level] || 'N1+'}`;
+    }
     return `Level ${level}`;
   }
 

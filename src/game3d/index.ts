@@ -23,7 +23,12 @@ function showTitleScreen(): void {
 
   // Title
   const title = document.createElement('div');
-  const subtitle = selectedLanguage === 'arabic' ? 'عداء الكلمات' : '汉语跑酷';
+  const subtitles: Record<Language, string> = {
+    chinese: '汉语跑酷',
+    arabic: 'عداء الكلمات',
+    japanese: '日本語ランナー',
+  };
+  const subtitle = subtitles[selectedLanguage];
   title.innerHTML = `
     <h1 style="color: #e94560; font-size: 64px; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">WORD</h1>
     <h1 style="color: #0f3460; font-size: 64px; margin: 0; -webkit-text-stroke: 2px #e94560;">RUNNER</h1>
@@ -35,11 +40,12 @@ function showTitleScreen(): void {
 
   // Language selector
   const langSelector = document.createElement('div');
-  langSelector.style.cssText = 'display: flex; gap: 15px; margin: 20px 0;';
+  langSelector.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin: 20px 0; align-items: center;';
 
   const langOptions: { id: Language; label: string }[] = [
     { id: 'chinese', label: '中文 Chinese' },
     { id: 'arabic', label: 'العربية Arabic' },
+    { id: 'japanese', label: '日本語 Japanese' },
   ];
 
   langOptions.forEach(opt => {
@@ -69,7 +75,12 @@ function showTitleScreen(): void {
   // Instructions
   const instructions = document.createElement('div');
   instructions.style.cssText = 'text-align: center; margin: 20px 0;';
-  const learnText = selectedLanguage === 'arabic' ? 'Learn Arabic while you run!' : 'Learn Chinese while you run!';
+  const learnTexts: Record<Language, string> = {
+    chinese: 'Learn Chinese while you run!',
+    arabic: 'Learn Arabic while you run!',
+    japanese: 'Learn Japanese while you run!',
+  };
+  const learnText = learnTexts[selectedLanguage];
   instructions.innerHTML = `
     <p style="color: #aaaaaa; font-size: 18px;">${learnText}</p>
     <p style="color: #888888; font-size: 16px; margin-top: 10px;">Match words with their translations</p>
@@ -100,56 +111,7 @@ function showTitleScreen(): void {
   startBtn.onclick = () => startGame(hasCustomDeck());
   container.appendChild(startBtn);
 
-  // Custom deck status
-  const deckStatus = document.createElement('div');
-  deckStatus.style.cssText = 'margin-top: 30px; text-align: center;';
-
-  const customDeck = hasCustomDeck();
-  if (customDeck) {
-    deckStatus.innerHTML = `
-      <p style="color: #00cc66; font-size: 14px;">Custom Deck Loaded</p>
-      <button id="useDefaultBtn" style="background: #4a3030; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px;">Use Default Instead</button>
-    `;
-  } else {
-    deckStatus.innerHTML = `
-      <p style="color: #888888; font-size: 14px;">Using Level 1-6 Vocabulary</p>
-      <label style="background: #0f3460; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; display: inline-block; margin-top: 10px;">
-        Upload Custom CSV
-        <input type="file" accept=".csv,.txt" style="display: none;" id="csvInput">
-      </label>
-    `;
-  }
-  container.appendChild(deckStatus);
-
-  // Handle CSV upload
-  setTimeout(() => {
-    const csvInput = document.getElementById('csvInput') as HTMLInputElement;
-    if (csvInput) {
-      csvInput.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          const text = await file.text();
-          const { parseAnkiCSV, saveCustomDeck } = await import('../utils/csvParser');
-          const result = parseAnkiCSV(text);
-          if (result.words.length > 0) {
-            saveCustomDeck(result.words);
-            showTitleScreen();
-          } else {
-            alert('No valid words found in CSV');
-          }
-        }
-      };
-    }
-
-    const useDefaultBtn = document.getElementById('useDefaultBtn');
-    if (useDefaultBtn) {
-      useDefaultBtn.onclick = async () => {
-        const { clearCustomDeck } = await import('../utils/csvParser');
-        clearCustomDeck();
-        showTitleScreen();
-      };
-    }
-  }, 0);
+  // Always start game with built-in vocabulary (CSV upload removed)
 
   // Keyboard start
   const handleKeydown = (e: KeyboardEvent) => {
