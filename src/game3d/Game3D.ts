@@ -47,6 +47,7 @@ export class Game3D {
   private lastGateSpawnTime: number = 0;
   private questionStartTime: number = 0;
   private isPaused: boolean = false;
+  private pauseStartTime: number = 0;
   private isGameOver: boolean = false;
   private useCustomDeck: boolean = false;
   private language: Language;
@@ -758,8 +759,15 @@ export class Game3D {
     this.isPaused = !this.isPaused;
     this.pauseOverlay.style.display = this.isPaused ? 'flex' : 'none';
 
-    if (!this.isPaused) {
-      // Clock handles timing automatically when resuming
+    if (this.isPaused) {
+      this.pauseStartTime = performance.now();
+    } else {
+      // Offset all time-based values by the pause duration so gates don't jump
+      const pauseDuration = performance.now() - this.pauseStartTime;
+      for (const gate of this.gates) {
+        gate.spawnTime += pauseDuration;
+      }
+      this.lastGateSpawnTime += pauseDuration;
       this.clock.start();
     }
   }
