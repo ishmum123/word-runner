@@ -1,6 +1,6 @@
-import type { Word } from '../types';
+import type { Word } from '../../types';
 
-export const hsk5Words: Word[] = [
+export const chinese5Words: Word[] = [
   { target: '灰色', pronunciation: 'huīsè', english: 'gray', category: 'colors' },
   { target: '棕色', pronunciation: 'zōngsè', english: 'brown', category: 'colors' },
   { target: '透明', pronunciation: 'tòumíng', english: 'transparent', category: 'colors' },

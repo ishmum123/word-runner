@@ -87,7 +87,7 @@ Speed multiplier increases slightly with each level.
 | `src/systems/WordManager.ts` | Language-aware word selection and distractors |
 | `src/systems/ScoreSystem.ts` | Points, streaks, accuracy |
 | `src/utils/csvParser.ts` | Anki CSV import for custom vocabulary |
-| `src/data/hsk1-6.ts` | Chinese vocabulary databases (~100 words each) |
+| `src/data/chinese/` | Chinese vocabulary databases (level1-6.ts, ~100 words each) |
 | `src/data/arabic/` | Arabic vocabulary databases (level1-6.ts, ~100 words each) |
 | `src/data/index.ts` | Language-aware word retrieval (`getWordsForLevel(level, language)`) |
 | `src/audio/SoundManager.ts` | Synthesized sound effects |
@@ -103,7 +103,7 @@ Edit `CORRECT_ANSWERS_PER_LEVEL` in DifficultySystem.ts (default: 50).
 ### Add New Words
 Add to the appropriate data file using `target`/`pronunciation` fields:
 ```typescript
-// Chinese: src/data/hskN.ts
+// Chinese: src/data/chinese/levelN.ts
 { target: '词', pronunciation: 'cí', english: 'word', category: 'education' }
 
 // Arabic: src/data/arabic/levelN.ts

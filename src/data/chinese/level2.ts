@@ -1,6 +1,6 @@
-import type { Word } from '../types';
+import type { Word } from '../../types';
 
-export const hsk2Words: Word[] = [
+export const chinese2Words: Word[] = [
   { target: '白', pronunciation: 'bái', english: 'white', category: 'colors' },
   { target: '黑', pronunciation: 'hēi', english: 'black', category: 'colors' },
   { target: '红', pronunciation: 'hóng', english: 'red', category: 'colors' },
