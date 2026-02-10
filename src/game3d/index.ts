@@ -2,7 +2,8 @@ import type { Language } from '../types';
 import { Game3D } from './Game3D';
 import { hasCustomDeck } from '../utils/csvParser';
 
-let selectedLanguage: Language = 'chinese';
+const LANGUAGE_STORAGE_KEY = 'wordrunner-language';
+let selectedLanguage: Language = (localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language) || 'chinese';
 
 function showTitleScreen(): void {
   const container = document.getElementById('app')!;
@@ -58,6 +59,7 @@ function showTitleScreen(): void {
     `;
     btn.onclick = () => {
       selectedLanguage = opt.id;
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, opt.id);
       showTitleScreen();
     };
     langSelector.appendChild(btn);
